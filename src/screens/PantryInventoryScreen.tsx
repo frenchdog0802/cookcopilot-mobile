@@ -1,0 +1,233 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+    View,
+    Text,
+    FlatList,
+    TouchableOpacity,
+    TextInput,
+    ScrollView,
+} from 'react-native';
+import {
+    PlusIcon,
+    MinusIcon,
+    TrashIcon,
+    SearchIcon,
+    PackageIcon,
+} from 'lucide-react-native';
+import { usePantry } from '../contexts/pantryContext';
+import useSearchIngredients from '../hooks/useSearchIngredient';
+import { PantryItem, IngredientEntry } from '../types';
+import AppHeader from '../components/AppHeader';
+
+interface PantryInventoryProps {
+    onBack?: () => void;
+}
+
+export default function PantryInventoryScreen({ onBack }: PantryInventoryProps = {}) {
+    const {
+        pantryItems: oriPantryItems,
+        updatePantryItem,
+        addPantryItem,
+        removePantryItem,
+        ingredients,
+        fetchAllPantryItems,
+    } = usePantry();
+
+    const [pantryItems, setPantryItems] = useState(oriPantryItems);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [isAddingItem, setIsAddingItem] = useState(false);
+    const [newItem, setNewItem] = useState({
+        name: '',
+        quantity: 1,
+        unit: '',
+    });
+    const [showDropdown, setShowDropdown] = useState(false);
+
+    useEffect(() => {
+        fetchAllPantryItems();
+    }, [fetchAllPantryItems]);
+
+    useEffect(() => {
+        setPantryItems(oriPantryItems);
+    }, [oriPantryItems]);
+
+    const { filteredIngredients, loading } = useSearchIngredients(
+        newItem.name,
+        ingredients
+    );
+
+    const filteredItems = useMemo(() => {
+        return pantryItems.filter(item =>
+            item.name.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    }, [pantryItems, searchQuery]);
+
+    const handleAddItem = () => {
+        if (!newItem.name.trim()) return;
+
+        const existing = pantryItems.find(
+            i => i.name.toLowerCase() === newItem.name.toLowerCase()
+        );
+
+        if (existing) {
+            updatePantryItem({ ...existing, quantity: newItem.quantity });
+        } else {
+            addPantryItem(newItem);
+        }
+
+        setNewItem({ name: '', quantity: 1, unit: '' });
+        setIsAddingItem(false);
+        setShowDropdown(false);
+    };
+
+    const handleUpdateQuantity = (item: PantryItem, delta: number) => {
+        const next = item.quantity + delta;
+        if (next >= 0) {
+            updatePantryItem({ ...item, quantity: next });
+        }
+    };
+
+    const renderItem = ({ item }: { item: PantryItem }) => (
+        <View className="rounded-xl bg-white p-4 mb-3 border border-gray-100">
+            <View className="flex-row justify-between items-start mb-2">
+                <View className="flex-1">
+                    <Text className="font-semibold text-gray-800 capitalize">
+                        {item.name}
+                    </Text>
+                    <Text className="text-xs text-gray-500">{item.unit}</Text>
+                </View>
+
+                <TouchableOpacity onPress={() => removePantryItem(item.id)}>
+                    <TrashIcon size={18} color="#ef4444" />
+                </TouchableOpacity>
+            </View>
+
+            <View className="flex-row justify-center items-center gap-4 mt-2">
+                <TouchableOpacity
+                    onPress={() => handleUpdateQuantity(item, -0.5)}
+                    className="bg-gray-100 p-3 rounded-lg"
+                >
+                    <MinusIcon size={18} />
+                </TouchableOpacity>
+
+                <Text className="text-2xl font-bold">{item.quantity}</Text>
+
+                <TouchableOpacity
+                    onPress={() => handleUpdateQuantity(item, 0.5)}
+                    className="bg-red-500 p-3 rounded-lg"
+                >
+                    <PlusIcon size={18} color="white" />
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
+
+    return (
+        <View className="flex-1 bg-gray-50">
+            <AppHeader title="Kitchen Inventory" showBackButton onBack={onBack} />
+
+            <ScrollView className="flex-1 p-4">
+                {/* Search */}
+                <View className="flex-row items-center bg-white rounded-xl px-3 mb-4 border border-gray-200">
+                    <SearchIcon size={18} color="#9ca3af" />
+                    <TextInput
+                        placeholder="Search ingredients..."
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        className="flex-1 p-3"
+                    />
+                </View>
+
+                {/* Add Item */}
+                {!isAddingItem ? (
+                    <TouchableOpacity
+                        onPress={() => setIsAddingItem(true)}
+                        className="bg-white border border-gray-200 rounded-xl p-4 flex-row justify-center items-center mb-4"
+                    >
+                        <PlusIcon size={18} />
+                        <Text className="ml-2 font-medium">Add New Item</Text>
+                    </TouchableOpacity>
+                ) : (
+                    <View className="bg-white rounded-xl p-4 mb-4 border border-gray-200">
+                        <TextInput
+                            placeholder="Item name"
+                            value={newItem.name}
+                            onChangeText={text => {
+                                setNewItem({ ...newItem, name: text });
+                                setShowDropdown(true);
+                            }}
+                            className="border border-gray-200 rounded-lg p-2 mb-2"
+                        />
+
+                        {showDropdown && (
+                            <View className="border border-gray-200 rounded-lg mb-2">
+                                {loading ? (
+                                    <Text className="p-3 text-center">Loading…</Text>
+                                ) : (
+                                    filteredIngredients.map(i => (
+                                        <TouchableOpacity
+                                            key={i.id}
+                                            onPress={() => {
+                                                setNewItem({
+                                                    name: i.name,
+                                                    quantity: 1,
+                                                    unit: i.default_unit || '',
+                                                });
+                                                setShowDropdown(false);
+                                            }}
+                                            className="p-3"
+                                        >
+                                            <Text>{i.name}</Text>
+                                        </TouchableOpacity>
+                                    ))
+                                )}
+                            </View>
+                        )}
+
+                        <TextInput
+                            placeholder="Unit (g, ml)"
+                            value={newItem.unit}
+                            onChangeText={unit =>
+                                setNewItem({ ...newItem, unit })
+                            }
+                            className="border border-gray-200 rounded-lg p-2 mb-3"
+                        />
+
+                        <View className="flex-row gap-2">
+                            <TouchableOpacity
+                                onPress={() => setIsAddingItem(false)}
+                                className="flex-1 bg-gray-100 p-3 rounded-lg"
+                            >
+                                <Text className="text-center">Cancel</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={handleAddItem}
+                                className="flex-1 bg-red-500 p-3 rounded-lg"
+                            >
+                                <Text className="text-white text-center">Add</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                )}
+
+                {/* List */}
+                {filteredItems.length === 0 ? (
+                    <View className="bg-white rounded-xl p-6 items-center">
+                        <PackageIcon size={32} color="#d1d5db" />
+                        <Text className="text-gray-500 mt-2">
+                            No items found
+                        </Text>
+                    </View>
+                ) : (
+                    <FlatList
+                        data={filteredItems}
+                        keyExtractor={item => String(item.id)}
+                        renderItem={renderItem}
+                        scrollEnabled={false}
+                    />
+                )}
+            </ScrollView>
+        </View>
+    );
+}
