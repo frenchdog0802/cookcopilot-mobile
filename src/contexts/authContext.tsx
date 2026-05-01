@@ -17,6 +17,7 @@ interface AuthContextType {
     logout: () => Promise<void>;
     isAuthenticated: boolean;
     googleLogin?: (token: string) => Promise<AuthResponse>;
+    auth0Login: (idToken: string, accessToken: string) => Promise<AuthResponse>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -136,6 +137,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return authResponse;
     };
 
+    /**
+     * Login with Auth0 tokens - syncs Auth0 user with backend
+     * Called after successful Auth0 Universal Login
+     */
+    const auth0Login = async (idToken: string, accessToken: string): Promise<AuthResponse> => {
+        setLoading(true);
+        const authResponse: AuthResponse = { success: false };
+
+        try {
+            const response = await auth.auth0Login(idToken, accessToken);
+
+            if (response && response.data && response.success) {
+                await authHelper.authenticate(response.data.token);
+                setUser(response.data.user);
+                await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
+                authResponse.success = true;
+            } else {
+                authResponse.message = response.message || 'Auth0 login failed';
+            }
+        } catch (error) {
+            console.error('Error during Auth0 login:', error);
+            authResponse.message = 'An error occurred during Auth0 login';
+        } finally {
+            setLoading(false);
+        }
+
+        return authResponse;
+    };
+
     const value = {
         user,
         loading,
@@ -144,6 +174,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated: !!user,
         googleLogin,
         signUp,
+        auth0Login,
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
