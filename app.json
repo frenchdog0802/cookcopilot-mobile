@@ -1,5 +1,6 @@
 {
   "expo": {
+    "scheme": "pantryapp",
     "name": "PantryApp",
     "slug": "PantryApp",
     "version": "1.0.0",
@@ -13,7 +14,11 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.pantry.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -21,11 +26,26 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.pantry.app"
     },
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
+    },
+    "plugins": [
+      "react-native-iap",
+      [
+        "react-native-auth0",
+        {
+          "domain": "dev-r1tfs3j17m7ipwcs.us.auth0.com"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "cf38de84-b63d-4d79-99fa-2dc29373f4d0"
+      }
     }
   }
 }

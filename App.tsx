@@ -1,5 +1,5 @@
 import "./global.css"
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -25,10 +25,15 @@ import ShoppingListScreen from './src/screens/ShoppingListScreen';
 import RecipeManagerScreen from './src/screens/RecipeManagerScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import AICookingAssistantScreen from './src/screens/AICookingAssistantScreen';
+import SubscriptionScreen from './src/screens/SubscriptionScreen';
 
 // Contexts
 import { AuthProvider, useAuth } from './src/contexts/authContext';
 import { PantryProvider } from './src/contexts/pantryContext';
+import { Auth0Provider } from './src/contexts/auth0Context';
+
+// TODO: [EXPO GO STUB] Uncomment for production builds with native IAP
+// import iapService from './src/services/iapService';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -56,6 +61,11 @@ function RootNavigator() {
             name="AICookingAssistant"
             component={AICookingAssistantScreen}
             options={{ title: 'AI Assistant' }}
+          />
+          <Stack.Screen
+            name="Subscription"
+            component={SubscriptionScreen}
+            options={{ title: 'Subscription' }}
           />
         </>
       ) : (
@@ -143,18 +153,23 @@ function MainTabs() {
   );
 }
 
-// Main App — now safe
-export default function App() {
+// Main App - Wrapped with Auth0 and IAP Context for subscription support
+function App() {
   return (
-    <AuthProvider>
-      <PantryProvider>
-        <NavigationContainer>
-          <StatusBar style="auto" />
-          <AuthCheck>
-            <RootNavigator />
-          </AuthCheck>
-        </NavigationContainer>
-      </PantryProvider>
-    </AuthProvider>
+    <Auth0Provider>
+      <AuthProvider>
+        <PantryProvider>
+          <NavigationContainer>
+            <StatusBar style="auto" />
+            <AuthCheck>
+              <RootNavigator />
+            </AuthCheck>
+          </NavigationContainer>
+        </PantryProvider>
+      </AuthProvider>
+    </Auth0Provider>
   );
 }
+
+// Export App directly (no wrapper needed for react-native-iap v14)
+export default App;

@@ -19,7 +19,7 @@ export default function useSearchIngredients(
 
         const lowerQuery = query.toLowerCase();
         return ingredients.filter((ingredient) =>
-            ingredient.name.toLowerCase().includes(lowerQuery)
+            ingredient.name && ingredient.name.toLowerCase().includes(lowerQuery)
         ).slice(0, 10); // Limit results
     }, [query, ingredients]);
 

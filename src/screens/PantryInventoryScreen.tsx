@@ -57,8 +57,11 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
     );
 
     const filteredItems = useMemo(() => {
+        if (!searchQuery.trim()) {
+            return pantryItems;
+        }
         return pantryItems.filter(item =>
-            item.name.toLowerCase().includes(searchQuery.toLowerCase())
+            item.name && item.name.toLowerCase().includes(searchQuery.toLowerCase())
         );
     }, [pantryItems, searchQuery]);
 
@@ -88,37 +91,43 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
     };
 
     const renderItem = ({ item }: { item: PantryItem }) => (
-        <View className="rounded-xl bg-white p-4 mb-3 border border-gray-100">
-            <View className="flex-row justify-between items-start mb-2">
-                <View className="flex-1">
-                    <Text className="font-semibold text-gray-800 capitalize">
-                        {item.name}
-                    </Text>
+        <View className="flex-row items-center p-3 bg-white rounded-xl mb-2 border border-gray-100">
+            {/* Name & Unit */}
+            <View className="flex-1 mr-3">
+                <Text
+                    className="font-semibold text-gray-800 capitalize"
+                    numberOfLines={1}
+                >
+                    {item.name}
+                </Text>
+                {item.unit ? (
                     <Text className="text-xs text-gray-500">{item.unit}</Text>
-                </View>
-
-                <TouchableOpacity onPress={() => removePantryItem(item.id)}>
-                    <TrashIcon size={18} color="#ef4444" />
-                </TouchableOpacity>
+                ) : null}
             </View>
 
-            <View className="flex-row justify-center items-center gap-4 mt-2">
+            {/* Quantity Controls */}
+            <View className="flex-row items-center mr-2">
                 <TouchableOpacity
                     onPress={() => handleUpdateQuantity(item, -0.5)}
-                    className="bg-gray-100 p-3 rounded-lg"
+                    className="bg-gray-100 p-2 rounded-lg"
                 >
-                    <MinusIcon size={18} />
+                    <MinusIcon size={16} color="#374151" />
                 </TouchableOpacity>
 
-                <Text className="text-2xl font-bold">{item.quantity}</Text>
+                <Text className="text-lg font-bold w-12 text-center">{item.quantity}</Text>
 
                 <TouchableOpacity
                     onPress={() => handleUpdateQuantity(item, 0.5)}
-                    className="bg-red-500 p-3 rounded-lg"
+                    className="bg-red-500 p-2 rounded-lg"
                 >
-                    <PlusIcon size={18} color="white" />
+                    <PlusIcon size={16} color="white" />
                 </TouchableOpacity>
             </View>
+
+            {/* Delete Button */}
+            <TouchableOpacity onPress={() => removePantryItem(item.id)} className="p-2">
+                <TrashIcon size={18} color="#ef4444" />
+            </TouchableOpacity>
         </View>
     );
 

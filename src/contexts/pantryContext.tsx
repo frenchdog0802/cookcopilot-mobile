@@ -190,9 +190,13 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const updatePantryItem = useCallback(async (item: PantryItem) => {
+        // Optimistically update the local state first
+        setPantryItems((prev) => prev.map((i) => (i.id === item.id ? item : i)));
+
         const response = await pantryItemApi.update(item.id, item);
         if (response.success && response.data) {
-            setPantryItems((prev) => prev.map((i) => (i.id === item.id ? response.data! : i)));
+            // Merge response with the original item to preserve any missing fields
+            setPantryItems((prev) => prev.map((i) => (i.id === item.id ? { ...item, ...response.data! } : i)));
         }
     }, []);
 
@@ -240,9 +244,13 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
     }, [shoppingList]);
 
     const updateShoppingListItem = useCallback(async (item: ShoppingListItem): Promise<ApiResponse<ShoppingListItem>> => {
+        // Optimistically update the local state first
+        setShoppingList((prev) => prev.map((i) => (i.id === item.id ? item : i)));
+
         const response = await shoppingListApi.update(item.id, item);
         if (response.success && response.data) {
-            setShoppingList((prev) => prev.map((i) => (i.id === item.id ? response.data! : i)));
+            // Merge response with the original item to preserve any missing fields
+            setShoppingList((prev) => prev.map((i) => (i.id === item.id ? { ...item, ...response.data! } : i)));
         }
         return response;
     }, []);

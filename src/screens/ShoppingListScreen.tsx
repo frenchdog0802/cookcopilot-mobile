@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, FlatList, TouchableOpacity, TextInput } from 'react-native';
 import { usePantry } from '../contexts/pantryContext';
-import { PlusIcon, CheckIcon, SearchIcon, TrashIcon, XIcon } from 'lucide-react-native';
+import { PlusIcon, MinusIcon, CheckIcon, SearchIcon, TrashIcon, XIcon } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import AppHeader from '../components/AppHeader';
 
@@ -45,10 +45,20 @@ export default function ShoppingListScreen() {
 
     // Filter shopping list items
     const filteredItems = useMemo(() => {
+        if (!searchQuery.trim()) {
+            return shoppingList;
+        }
         return shoppingList.filter(item => {
-            return item.name.toLowerCase().includes(searchQuery.toLowerCase());
+            return item.name && item.name.toLowerCase().includes(searchQuery.toLowerCase());
         });
     }, [shoppingList, searchQuery]);
+
+    const handleUpdateQuantity = async (item: ShoppingListItem, delta: number) => {
+        const next = item.quantity + delta;
+        if (next >= 0) {
+            await updateShoppingListItem({ ...item, quantity: next });
+        }
+    };
 
     const handleTogglePurchased = async (id: string) => {
         const item = shoppingList.find(i => i.id === id);
@@ -78,28 +88,55 @@ export default function ShoppingListScreen() {
     };
 
     const renderItem = ({ item }: { item: ShoppingListItem }) => (
-        <TouchableOpacity
-            onPress={() => handleTogglePurchased(item.id)}
-            className={`flex-row items-center p-4 bg-white rounded-xl mb-2 ${item.checked ? 'bg-gray-50' : ''}`}
-        >
-            <View
-                className={`w-6 h-6 rounded border-2 mr-3 items-center justify-center ${item.checked ? 'bg-green-500 border-green-500' : 'border-gray-300'
-                    }`}
-            >
-                {item.checked && <CheckIcon size={14} color="white" />}
-            </View>
-            <View className="flex-1">
-                <Text className={`font-medium capitalize ${item.checked ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+        <View className={`flex-row items-center p-3 bg-white rounded-xl mb-2 ${item.checked ? 'bg-gray-50' : ''}`}>
+            {/* Checkbox */}
+            <TouchableOpacity onPress={() => handleTogglePurchased(item.id)} className="mr-3">
+                <View
+                    className={`w-6 h-6 rounded border-2 items-center justify-center ${item.checked ? 'bg-green-500 border-green-500' : 'border-gray-300'}`}
+                >
+                    {item.checked && <CheckIcon size={14} color="white" />}
+                </View>
+            </TouchableOpacity>
+
+            {/* Name & Unit */}
+            <View className="flex-1 mr-3">
+                <Text
+                    className={`font-medium capitalize ${item.checked ? 'line-through text-gray-400' : 'text-gray-800'}`}
+                    numberOfLines={1}
+                >
                     {item.name}
                 </Text>
-                <Text className={`text-sm ${item.checked ? 'text-gray-300' : 'text-gray-500'}`}>
-                    {item.quantity} {item.unit}
-                </Text>
+                {item.unit ? (
+                    <Text className={`text-xs ${item.checked ? 'text-gray-300' : 'text-gray-500'}`}>
+                        {item.unit}
+                    </Text>
+                ) : null}
             </View>
+
+            {/* Quantity Controls */}
+            <View className="flex-row items-center mr-2">
+                <TouchableOpacity
+                    onPress={() => handleUpdateQuantity(item, -0.5)}
+                    className="bg-gray-100 p-2 rounded-lg"
+                >
+                    <MinusIcon size={16} color="#374151" />
+                </TouchableOpacity>
+
+                <Text className="text-lg font-bold w-12 text-center">{item.quantity}</Text>
+
+                <TouchableOpacity
+                    onPress={() => handleUpdateQuantity(item, 0.5)}
+                    className="bg-red-500 p-2 rounded-lg"
+                >
+                    <PlusIcon size={16} color="white" />
+                </TouchableOpacity>
+            </View>
+
+            {/* Delete Button */}
             <TouchableOpacity className="p-2">
                 <TrashIcon size={18} color="#ef4444" />
             </TouchableOpacity>
-        </TouchableOpacity>
+        </View>
     );
 
     return (

@@ -8,6 +8,8 @@ import {
     ScrollView,
     KeyboardAvoidingView,
     Platform,
+    ActivityIndicator,
+    Alert
 } from 'react-native';
 import {
     SendIcon,
@@ -21,6 +23,7 @@ import { useNavigation } from '@react-navigation/native';
 import { usePantry } from '../contexts/pantryContext';
 import { RecipeSuggestion, Recipe } from '../types';
 import AppHeader from '../components/AppHeader';
+import { chatApi, ChatResponseData } from '../api/chat';
 
 interface Message {
     id: string;
@@ -49,80 +52,14 @@ export default function AICookingAssistantScreen() {
     const [savedRecipes, setSavedRecipes] = useState<RecipeSuggestion[]>([]);
     const [showSaved, setShowSaved] = useState(false);
 
-    // Mock recipe suggestions based on input
-    const generateRecipeSuggestion = (userInput: string): RecipeSuggestion => {
-        const ingredients = userInput.toLowerCase();
-
-        // Simple mock logic - in real app, this would call an AI API
-        let recipe: RecipeSuggestion = {
-            id: `recipe-${Date.now()}`,
-            name: 'Quick Stir Fry',
-            ingredients: [
-                { name: 'Vegetables', quantity: 200, unit: 'g' },
-                { name: 'Soy Sauce', quantity: 2, unit: 'tbsp' },
-                { name: 'Oil', quantity: 1, unit: 'tbsp' },
-            ],
-            instructions: [
-                'Heat oil in a wok over high heat',
-                'Add vegetables and stir fry for 3-4 minutes',
-                'Add soy sauce and toss to coat',
-                'Serve hot with rice',
-            ],
-            cookTime: 15,
-            difficulty: 'Easy',
-        };
-
-        if (ingredients.includes('pasta') || ingredients.includes('noodle')) {
-            recipe = {
-                id: `recipe-${Date.now()}`,
-                name: 'Simple Pasta',
-                ingredients: [
-                    { name: 'Pasta', quantity: 200, unit: 'g' },
-                    { name: 'Garlic', quantity: 2, unit: 'cloves' },
-                    { name: 'Olive Oil', quantity: 3, unit: 'tbsp' },
-                    { name: 'Parmesan', quantity: 50, unit: 'g' },
-                ],
-                instructions: [
-                    'Boil pasta according to package directions',
-                    'Sauté garlic in olive oil until golden',
-                    'Toss drained pasta with garlic oil',
-                    'Top with parmesan and serve',
-                ],
-                cookTime: 20,
-                difficulty: 'Easy',
-            };
-        } else if (ingredients.includes('chicken')) {
-            recipe = {
-                id: `recipe-${Date.now()}`,
-                name: 'Honey Garlic Chicken',
-                ingredients: [
-                    { name: 'Chicken Breast', quantity: 400, unit: 'g' },
-                    { name: 'Honey', quantity: 3, unit: 'tbsp' },
-                    { name: 'Garlic', quantity: 4, unit: 'cloves' },
-                    { name: 'Soy Sauce', quantity: 2, unit: 'tbsp' },
-                ],
-                instructions: [
-                    'Season chicken with salt and pepper',
-                    'Sear chicken in a hot pan until golden',
-                    'Add garlic, honey, and soy sauce',
-                    'Simmer until chicken is cooked through',
-                    'Garnish with green onions',
-                ],
-                cookTime: 25,
-                difficulty: 'Medium',
-            };
-        }
-
-        return recipe;
-    };
-
     const handleSend = async () => {
         if (!input.trim()) return;
 
+        const userMessageContent = input.trim();
         const userMessage: Message = {
             id: `user-${Date.now()}`,
             role: 'user',
-            content: input,
+            content: userMessageContent,
             timestamp: Date.now(),
         };
 
@@ -130,22 +67,66 @@ export default function AICookingAssistantScreen() {
         setInput('');
         setIsTyping(true);
 
-        // Simulate AI thinking
-        setTimeout(() => {
-            const recipe = generateRecipeSuggestion(input);
+        try {
+            const response = await chatApi.send(userMessageContent);
+            console.log('AI Response:', response);
 
-            const aiMessage: Message = {
-                id: `ai-${Date.now()}`,
+            if (response.success && response.data) {
+                const aiData = response.data;
+
+                let messageContent = aiData.message;
+                let recipe: RecipeSuggestion | undefined;
+                let messageType: 'text' | 'recipe' = 'text';
+
+                if (aiData.type === 'recipe' && aiData.data) {
+                    messageType = 'recipe';
+                    // Map backend recipe data to frontend RecipeSuggestion
+                    recipe = {
+                        id: `recipe-${Date.now()}`,
+                        name: aiData.data.title,
+                        ingredients: aiData.data.ingredients,
+                        instructions: aiData.data.steps,
+                        cookTime: 0, // Not provided by backend currently
+                        difficulty: 'Medium', // Not provided by backend currently
+                    };
+                } else if (aiData.type === 'tip') {
+                    messageContent = aiData.data?.content || messageContent;
+                } else if (aiData.type === 'clarification') {
+                    messageContent = aiData.data?.question || messageContent;
+                }
+
+                const aiMessage: Message = {
+                    id: `ai-${Date.now()}`,
+                    role: 'assistant',
+                    content: messageContent,
+                    type: messageType,
+                    recipe,
+                    timestamp: Date.now(),
+                };
+
+                setMessages((prev) => [...prev, aiMessage]);
+            } else {
+                const errorMessage: Message = {
+                    id: `error-${Date.now()}`,
+                    role: 'assistant',
+                    content: "Sorry, I couldn't get a response. Please try again.",
+                    timestamp: Date.now(),
+                };
+                setMessages((prev) => [...prev, errorMessage]);
+            }
+
+        } catch (error) {
+            console.error(error);
+            const errorMessage: Message = {
+                id: `error-${Date.now()}`,
                 role: 'assistant',
-                content: `Based on what you have, here's a recipe suggestion:`,
-                type: 'recipe',
-                recipe,
+                content: "Network error. Please check your connection.",
                 timestamp: Date.now(),
             };
-
-            setMessages((prev) => [...prev, aiMessage]);
+            setMessages((prev) => [...prev, errorMessage]);
+        } finally {
             setIsTyping(false);
-        }, 1500);
+        }
     };
 
     const handleSaveRecipe = (recipe: RecipeSuggestion) => {
@@ -163,6 +144,7 @@ export default function AICookingAssistantScreen() {
         };
 
         await addRecipe(newRecipe);
+        Alert.alert('Success', 'Recipe added to your collection!');
     };
 
     const handleAddToShoppingList = async (recipe: RecipeSuggestion) => {
@@ -174,6 +156,7 @@ export default function AICookingAssistantScreen() {
                 checked: false,
             });
         }
+        Alert.alert('Success', 'Ingredients added to shopping list!');
     };
 
     const handleClearChat = () => {
@@ -185,6 +168,7 @@ export default function AICookingAssistantScreen() {
                 timestamp: Date.now(),
             },
         ]);
+        setSavedRecipes([]);
     };
 
     const renderMessage = ({ item }: { item: Message }) => {
@@ -203,10 +187,10 @@ export default function AICookingAssistantScreen() {
                         <View className="mt-3 bg-gray-50 rounded-xl p-4 border border-gray-100">
                             <Text className="font-bold text-lg text-gray-800 mb-2">{item.recipe.name}</Text>
 
-                            <View className="flex-row gap-4 mb-3">
+                            {/* <View className="flex-row gap-4 mb-3">
                                 <Text className="text-sm text-gray-500">⏱ {item.recipe.cookTime} min</Text>
                                 <Text className="text-sm text-gray-500">📊 {item.recipe.difficulty}</Text>
-                            </View>
+                            </View> */}
 
                             <Text className="font-medium text-gray-700 mb-1">Ingredients:</Text>
                             {item.recipe.ingredients.map((ing, idx) => (
@@ -323,7 +307,8 @@ export default function AICookingAssistantScreen() {
                 {/* Typing Indicator */}
                 {isTyping && (
                     <View className="px-4 pb-2">
-                        <View className="bg-white rounded-2xl px-4 py-3 self-start border border-gray-200">
+                        <View className="bg-white rounded-2xl px-4 py-3 self-start border border-gray-200 flex-row items-center gap-2">
+                            <ActivityIndicator size="small" color="#f97316" />
                             <Text className="text-gray-500">Thinking...</Text>
                         </View>
                     </View>
@@ -343,10 +328,10 @@ export default function AICookingAssistantScreen() {
                         />
                         <TouchableOpacity
                             onPress={handleSend}
-                            disabled={!input.trim()}
-                            className={`p-3 rounded-xl ${input.trim() ? 'bg-orange-500' : 'bg-gray-200'}`}
+                            disabled={!input.trim() || isTyping}
+                            className={`p-3 rounded-xl ${input.trim() && !isTyping ? 'bg-orange-500' : 'bg-gray-200'}`}
                         >
-                            <SendIcon size={20} color={input.trim() ? 'white' : '#9ca3af'} />
+                            <SendIcon size={20} color={input.trim() && !isTyping ? 'white' : '#9ca3af'} />
                         </TouchableOpacity>
                     </View>
                 </View>

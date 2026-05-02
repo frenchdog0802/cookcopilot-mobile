@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, TextInput } from 'react-native';
 import { useAuth } from '../contexts/authContext';
+import { useAuth0Context } from '../contexts/auth0Context';
 import { useNavigation } from '@react-navigation/native';
 import { UserIcon, SettingsIcon, PaletteIcon, SaveIcon, CheckIcon } from 'lucide-react-native';
 import AppHeader from '../components/AppHeader';
 
 export default function SettingsScreen() {
     const { logout, user } = useAuth();
+    const { logout: auth0Logout, isAuthenticated: isAuth0Authenticated } = useAuth0Context();
     const navigation = useNavigation();
 
     const [activeTab, setActiveTab] = useState('profile');
@@ -17,6 +19,14 @@ export default function SettingsScreen() {
     const [showSaveMessage, setShowSaveMessage] = useState(false);
 
     const handleLogout = async () => {
+        // Clear both local auth and Auth0 session
+        if (isAuth0Authenticated) {
+            try {
+                await auth0Logout();
+            } catch (err) {
+                console.error('Auth0 logout error:', err);
+            }
+        }
         await logout();
         navigation.reset({
             index: 0,
@@ -76,6 +86,23 @@ export default function SettingsScreen() {
                                 <PaletteIcon size={16} color={activeTab === 'appearance' ? '#f97316' : '#6b7280'} />
                                 <Text className={`ml-1 text-sm font-medium ${activeTab === 'appearance' ? 'text-orange-600' : 'text-gray-600'}`}>
                                     Theme
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                className={`flex-1 flex-row items-center justify-center py-4 ${activeTab === 'appearance' ? 'border-b-2 border-orange-500' : ''}`}
+                                onPress={() => setActiveTab('appearance')}
+                            >
+                                <PaletteIcon size={16} color={activeTab === 'appearance' ? '#f97316' : '#6b7280'} />
+                                <Text className={`ml-1 text-sm font-medium ${activeTab === 'appearance' ? 'text-orange-600' : 'text-gray-600'}`}>
+                                    Theme
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                className={`flex-1 flex-row items-center justify-center py-4`}
+                                onPress={() => navigation.navigate('Subscription' as never)}
+                            >
+                                <Text className="ml-1 text-sm font-medium text-orange-600">
+                                    Upgrade
                                 </Text>
                             </TouchableOpacity>
                         </View>
