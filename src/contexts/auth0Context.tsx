@@ -25,7 +25,7 @@ export interface Auth0User {
 }
 
 // Social connection types supported by Auth0
-export type SocialConnection = 'google-oauth2' | 'facebook' | 'apple';
+export type SocialConnection = 'google-oauth2' | 'apple';
 
 /**
  * Check if the error is a user-cancelled error that should be suppressed
@@ -55,7 +55,6 @@ interface Auth0ContextType {
     // Auth methods
     loginWithAuth0: () => Promise<void>;
     loginWithGoogle: () => Promise<void>;
-    loginWithFacebook: () => Promise<void>;
     loginWithApple: () => Promise<void>;
     logout: () => Promise<void>;
     getAccessToken: () => Promise<string | null>;
@@ -130,13 +129,6 @@ function Auth0ContextProvider({ children }: { children: React.ReactNode }) {
         console.log('[Auth0] loginWithGoogle completed');
     }, [loginWithConnection]);
 
-    // Login with Facebook - bypasses Auth0 hosted login
-    const loginWithFacebook = useCallback(async () => {
-        console.log('[Auth0] loginWithFacebook called');
-        await loginWithConnection('facebook');
-        console.log('[Auth0] loginWithFacebook completed');
-    }, [loginWithConnection]);
-
     // Login with Apple - bypasses Auth0 hosted login
     const loginWithApple = useCallback(async () => {
         console.log('[Auth0] loginWithApple called');
@@ -190,12 +182,11 @@ function Auth0ContextProvider({ children }: { children: React.ReactNode }) {
         idToken: null,
         loginWithAuth0,
         loginWithGoogle,
-        loginWithFacebook,
         loginWithApple,
         logout,
         getAccessToken,
         getIdToken,
-    }), [user, isLoading, error, loginWithAuth0, loginWithGoogle, loginWithFacebook, loginWithApple, logout, getAccessToken, getIdToken]);
+    }), [user, isLoading, error, loginWithAuth0, loginWithGoogle, loginWithApple, logout, getAccessToken, getIdToken]);
 
     return (
         <Auth0Context.Provider value={value}>

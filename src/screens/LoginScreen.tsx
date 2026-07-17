@@ -29,7 +29,6 @@ export default function LoginScreen({ onLoginSuccess, onSignUp }: LoginProps = {
     const { login, loading, auth0Login } = useAuth();
     const {
         loginWithGoogle,
-        loginWithFacebook,
         loginWithApple,
         isLoading: auth0Loading,
         getAccessToken,
@@ -105,7 +104,6 @@ export default function LoginScreen({ onLoginSuccess, onSignUp }: LoginProps = {
     };
 
     const handleGoogleLogin = () => handleSSOLogin(loginWithGoogle, 'Google');
-    const handleFacebookLogin = () => handleSSOLogin(loginWithFacebook, 'Facebook');
     const handleAppleLogin = () => handleSSOLogin(loginWithApple, 'Apple');
 
     return (
@@ -215,20 +213,6 @@ export default function LoginScreen({ onLoginSuccess, onSignUp }: LoginProps = {
                                             </View>
                                             <Text className="text-gray-700 font-semibold text-base">
                                                 Continue with Google
-                                            </Text>
-                                        </TouchableOpacity>
-
-                                        {/* Facebook Button */}
-                                        <TouchableOpacity
-                                            onPress={handleFacebookLogin}
-                                            className="w-full flex-row items-center justify-center py-4 rounded-xl mb-3 shadow-sm"
-                                            style={{ backgroundColor: '#1877F2', elevation: 2 }}
-                                        >
-                                            <View className="w-6 h-6 mr-3 items-center justify-center">
-                                                <Ionicons name="logo-facebook" size={24} color="#FFFFFF" />
-                                            </View>
-                                            <Text className="text-white font-semibold text-base">
-                                                Continue with Facebook
                                             </Text>
                                         </TouchableOpacity>
 

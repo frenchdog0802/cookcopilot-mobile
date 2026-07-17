@@ -35,7 +35,7 @@ import {
     CameraIcon,
     ImageIcon,
 } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import AppHeader from '../components/AppHeader';
 
@@ -58,6 +58,8 @@ const DEFAULT_FOLDER_NAMES = ['Uncategorized', 'Favorites', 'Breakfast', 'Lunch'
 
 export default function RecipeManagerScreen() {
     const navigation = useNavigation();
+    const route = useRoute();
+    const recipeIdParam = (route.params as { recipeId?: string } | undefined)?.recipeId;
 
     // ========================================================================
     // STATE - Data from API
@@ -168,6 +170,16 @@ export default function RecipeManagerScreen() {
     useEffect(() => {
         loadData();
     }, [loadData]);
+
+    useEffect(() => {
+        if (!recipeIdParam || recipes.length === 0) {
+            return;
+        }
+        const match = recipes.find((recipe) => recipe.id === recipeIdParam);
+        if (match) {
+            setSelectedRecipe(match);
+        }
+    }, [recipeIdParam, recipes]);
 
     // ========================================================================
     // COMPUTED VALUES

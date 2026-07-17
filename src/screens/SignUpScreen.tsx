@@ -73,10 +73,6 @@ export default function SignUpScreen() {
         console.log('Google sign up triggered');
     };
 
-    const handleFacebookSignUp = () => {
-        console.log('Facebook sign up triggered');
-    };
-
     return (
         <SafeAreaView className="flex-1 bg-gray-50">
             <KeyboardAvoidingView
@@ -207,14 +203,6 @@ export default function SignUpScreen() {
                                             >
                                                 <Ionicons name="logo-google" size={22} color="#DB4437" />
                                                 <Text className="ml-3 text-gray-700 font-medium">Sign up with Google</Text>
-                                            </TouchableOpacity>
-
-                                            <TouchableOpacity
-                                                onPress={handleFacebookSignUp}
-                                                className="w-full flex-row items-center justify-center py-3 border border-gray-300 rounded-lg bg-white"
-                                            >
-                                                <Ionicons name="logo-facebook" size={22} color="#1877F2" />
-                                                <Text className="ml-3 text-gray-700 font-medium">Sign up with Facebook</Text>
                                             </TouchableOpacity>
                                         </View>
 

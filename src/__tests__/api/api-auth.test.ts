@@ -67,7 +67,7 @@ describe('auth API', () => {
                 data: { user: { id: '1', name: 'New', email: 'new@test.com' }, token: 'jwt' },
             });
 
-            const userData = { id: '', name: 'New', email: 'new@test.com' };
+            const userData = { id: '', name: 'New', email: 'new@test.com', first_name: 'New', last_name: 'User' };
             await auth.signup(userData, 'password123');
 
             expect(mockedApi.post).toHaveBeenCalledWith('/auth/signup', {
