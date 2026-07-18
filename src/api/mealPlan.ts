@@ -1,19 +1,28 @@
 import { api } from './client';
-import { MealPlan, ApiResponse } from '../types';
+import { MealPlan, ApiResponse, ConfirmMealPlanResult } from '../types';
 
 export const mealPlanApi = {
-    list: (query?: string): Promise<ApiResponse<MealPlan[]>> =>
-        api.get<MealPlan[]>(query ? `meal-plan?query=${encodeURIComponent(query)}` : 'meal-plan'),
+    list: (query?: string): Promise<ApiResponse<MealPlan[] | { mealPlans?: MealPlan[] }>> =>
+        api.get(query ? `meal-plan?query=${encodeURIComponent(query)}` : 'meal-plan'),
 
     get: (id: string | number): Promise<ApiResponse<MealPlan>> =>
-        api.get<MealPlan>(`meal-plan/${id}`),
+        api.get(`meal-plan/${id}`),
 
-    create: (data: Partial<MealPlan>): Promise<ApiResponse<MealPlan>> =>
-        api.post<MealPlan>('meal-plan', data),
+    pendingConfirm: (): Promise<ApiResponse<MealPlan[] | { mealPlans?: MealPlan[] }>> =>
+        api.get('meal-plan/pending-confirm'),
+
+    create: (data: Partial<MealPlan>): Promise<ApiResponse<MealPlan | { mealPlan?: MealPlan }>> =>
+        api.post('meal-plan', data),
+
+    confirm: (id: string | number): Promise<ApiResponse<ConfirmMealPlanResult>> =>
+        api.post(`meal-plan/${id}/confirm`),
+
+    skip: (id: string | number): Promise<ApiResponse<{ mealPlan: MealPlan; alreadySkipped: boolean }>> =>
+        api.post(`meal-plan/${id}/skip`),
 
     update: (id: string | number, data: Partial<MealPlan>): Promise<ApiResponse<MealPlan>> =>
-        api.put<MealPlan>(`meal-plan/${id}`, data),
+        api.put(`meal-plan/${id}`, data),
 
     delete: (id: string | number): Promise<ApiResponse<void>> =>
-        api.delete<void>(`meal-plan/${id}`),
+        api.delete(`meal-plan/${id}`),
 };

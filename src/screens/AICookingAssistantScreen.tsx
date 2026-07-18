@@ -23,6 +23,7 @@ import { useNavigation } from '@react-navigation/native';
 import { usePantry } from '../contexts/pantryContext';
 import { RecipeSuggestion, Recipe } from '../types';
 import AppHeader from '../components/AppHeader';
+import ChatMessageContent from '../components/ChatMessageContent';
 import { chatApi, ChatResponseData, ChatResponseType, HistoryMessage } from '../api/chat';
 import { mealPlanApi } from '../api/mealPlan';
 
@@ -268,9 +269,11 @@ export default function AICookingAssistantScreen() {
                     className={`max-w-[85%] rounded-2xl px-4 py-3 ${isUser ? 'bg-orange-500' : item.type === 'error' ? 'bg-red-50 border border-red-200' : 'bg-white border border-gray-200'
                         }`}
                 >
-                    <Text className={isUser ? 'text-white' : item.type === 'error' ? 'text-red-700' : 'text-gray-800'}>
-                        {item.content}
-                    </Text>
+                    <ChatMessageContent
+                        content={item.content}
+                        isUser={isUser}
+                        style={item.type === 'error' && !isUser ? { color: '#b91c1c' } : undefined}
+                    />
 
                     {(item.type === 'recipe_created' || item.type === 'recipe_imported') && item.cardData && (
                         <View className="mt-3 bg-gray-50 rounded-xl p-4 border border-gray-100">
@@ -280,6 +283,18 @@ export default function AICookingAssistantScreen() {
                             <Text className="text-sm text-gray-500 mb-3">
                                 {item.cardData.ingredientCount ?? 0} ingredients · {(item.cardData.steps ?? []).length} steps
                             </Text>
+                            {(item.cardData.steps ?? []).length > 0 && (
+                                <View className="mb-3">
+                                    {(item.cardData.steps ?? []).map((step, index) => (
+                                        <View key={index} className="flex-row mb-2">
+                                            <View className="w-5 h-5 rounded-full bg-orange-100 items-center justify-center mr-2 mt-0.5">
+                                                <Text className="text-xs font-medium text-orange-700">{index + 1}</Text>
+                                            </View>
+                                            <Text className="flex-1 text-sm text-gray-700 leading-5">{step}</Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            )}
                             <View className="flex-row gap-2">
                                 <TouchableOpacity
                                     onPress={() => item.cardData?.recipeId && handleViewCreatedRecipe(item.cardData.recipeId)}
@@ -470,7 +485,7 @@ export default function AICookingAssistantScreen() {
                     <View className="flex-row items-center gap-2">
                         <TextInput
                             className="flex-1 bg-gray-100 rounded-xl px-4 py-3"
-                            placeholder="Ask CookPlanner to plan, import, or organize..."
+                            placeholder="Ask CookCopilot to plan, import, or organize..."
                             placeholderTextColor="#9ca3af"
                             value={input}
                             onChangeText={setInput}

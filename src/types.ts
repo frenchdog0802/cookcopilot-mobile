@@ -25,10 +25,25 @@ export interface UserSettings {
     measurement_unit: string;
 }
 
+export interface UserPreferences {
+    id?: string;
+    allergies: string[];
+    dislikes: string[];
+    likes: string[];
+    dietaryRestrictions: string[];
+    householdNotes: string;
+    measurementUnit: 'metric' | 'imperial';
+    notes: string;
+}
+
 export interface IngredientEntry {
     id: string;
     name: string;
     default_unit: string;
+    unit_kind?: 'weight' | 'volume' | 'count';
+    base_unit?: string;
+    default_display_unit?: string;
+    kind_locked?: boolean;
     image_url?: number;
 }
 
@@ -47,6 +62,10 @@ export interface Recipe {
         name: string;
         quantity: number;
         unit: string;
+        ingredient_id?: string;
+        unit_kind?: string;
+        base_unit?: string;
+        default_display_unit?: string;
     }[];
     image: {
         public_id: string;
@@ -60,6 +79,10 @@ export type ShoppingListItem = {
     quantity: number;
     unit: string;
     checked: boolean;
+    ingredient_id?: string;
+    unit_kind?: string;
+    base_unit?: string;
+    default_display_unit?: string;
 };
 
 export interface PantryItem {
@@ -69,6 +92,10 @@ export interface PantryItem {
     item_planned?: number;
     item_to_buy?: number;
     unit: string;
+    ingredient_id?: string;
+    unit_kind?: string;
+    base_unit?: string;
+    default_display_unit?: string;
 }
 
 export interface MealPlan {
@@ -78,6 +105,29 @@ export interface MealPlan {
     recipe_id: string;
     meal_name: string;
     image?: string | null;
+    status?: 'PLANNED' | 'PENDING_CONFIRM' | 'CONFIRMED' | 'SKIPPED';
+}
+
+export interface MealConfirmShortage {
+    ingredient_id?: string;
+    name: string;
+    needed: number;
+    available: number;
+    unit: string;
+}
+
+export interface ConfirmMealPlanResult {
+    mealPlan: MealPlan;
+    shortages: MealConfirmShortage[];
+    deducted: Array<{
+        ingredient_id?: string;
+        name: string;
+        deducted: number;
+        previous_quantity: number;
+        new_quantity: number;
+        unit: string;
+    }>;
+    alreadyConfirmed: boolean;
 }
 
 export interface RecipeSuggestion {

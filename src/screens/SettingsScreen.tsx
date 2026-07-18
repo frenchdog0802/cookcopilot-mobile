@@ -1,22 +1,45 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, TextInput } from 'react-native';
 import { useAuth } from '../contexts/authContext';
 import { useAuth0Context } from '../contexts/auth0Context';
+import { usePantry } from '../contexts/pantryContext';
 import { useNavigation } from '@react-navigation/native';
 import { UserIcon, SettingsIcon, PaletteIcon, SaveIcon, CheckIcon } from 'lucide-react-native';
 import AppHeader from '../components/AppHeader';
+import { userPreferencesApi } from '../api/userPreferences';
 
 export default function SettingsScreen() {
     const { logout, user } = useAuth();
     const { logout: auth0Logout, isAuthenticated: isAuth0Authenticated } = useAuth0Context();
+    const { userSettings, updateUserSettings } = usePantry();
     const navigation = useNavigation();
 
     const [activeTab, setActiveTab] = useState('profile');
     const [theme, setTheme] = useState('light');
-    const [units, setUnits] = useState('imperial');
+    const [units, setUnits] = useState(userSettings.measurement_unit === 'imperial' ? 'imperial' : 'metric');
     const [name, setName] = useState(user?.name || '');
     const [email, setEmail] = useState(user?.email || '');
     const [showSaveMessage, setShowSaveMessage] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const prefs = await userPreferencesApi.get();
+                if (!cancelled && prefs?.measurementUnit) {
+                    setUnits(prefs.measurementUnit);
+                    updateUserSettings({
+                        ...userSettings,
+                        measurement_unit: prefs.measurementUnit,
+                    });
+                }
+            } catch {
+                // ignore load errors on settings open
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
 
     const handleLogout = async () => {
         // Clear both local auth and Auth0 session
@@ -34,12 +57,26 @@ export default function SettingsScreen() {
         });
     };
 
-    const handleSave = () => {
-        // In a real app, this would save to backend
-        setShowSaveMessage(true);
-        setTimeout(() => {
-            setShowSaveMessage(false);
-        }, 3000);
+    const handleSave = async () => {
+        setErrorMessage('');
+        try {
+            const measurementUnit = units === 'imperial' ? 'imperial' : 'metric';
+            const saved = await userPreferencesApi.update({ measurementUnit });
+            if (!saved) {
+                setErrorMessage('Could not save preferences.');
+                return;
+            }
+            updateUserSettings({
+                ...userSettings,
+                measurement_unit: saved.measurementUnit,
+            });
+            setShowSaveMessage(true);
+            setTimeout(() => {
+                setShowSaveMessage(false);
+            }, 3000);
+        } catch {
+            setErrorMessage('Could not save preferences.');
+        }
     };
 
     const RadioButton = ({ selected, onPress, label }: { selected: boolean; onPress: () => void; label: string }) => (
@@ -168,6 +205,9 @@ export default function SettingsScreen() {
                                         <SaveIcon size={18} color="white" />
                                         <Text className="text-white font-medium ml-2">Save Changes</Text>
                                     </TouchableOpacity>
+                                    {errorMessage ? (
+                                        <Text className="text-red-500 text-sm mt-2">{errorMessage}</Text>
+                                    ) : null}
                                 </View>
                             )}
 

@@ -6,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ApiResponse } from '../types';
 
 // Configure your API base URL
-const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://cookplanner-bxa2bjfchzcfdyet.eastus2-01.azurewebsites.net/api/';
+const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://CookCopilot-bxa2bjfchzcfdyet.eastus2-01.azurewebsites.net/api/';
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     // Get stored JWT token

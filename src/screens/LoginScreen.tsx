@@ -116,7 +116,7 @@ export default function LoginScreen({ onLoginSuccess, onSignUp }: LoginProps = {
                     <View className="w-full max-w-md mx-auto">
                         {/* Header */}
                         <View className="items-center mb-8">
-                            <Text className="text-4xl font-bold text-orange-600">ManageEat</Text>
+                                <Text className="text-4xl font-bold text-orange-600">CookCopilot</Text>
                             <Text className="mt-2 text-base text-gray-600">Sign in to your account</Text>
                         </View>
 

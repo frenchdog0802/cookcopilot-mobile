@@ -38,11 +38,31 @@ import {
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import AppHeader from '../components/AppHeader';
+import { UnitSelect, QuantityLabel, preferredUnitForIngredient } from '../components/UnitSelect';
+import type { MeasurementSystem } from '../utils/units';
 
 // API imports
 import { recipeApi } from '../api/recipe';
 import { folderApi } from '../api/folder';
 import { Recipe, Folder, ApiResponse } from '../types';
+import { normalizeRecipe, usePantry } from '../contexts/pantryContext';
+
+function unwrapListResponse<T>(data: T[] | Record<string, T[] | undefined>, key: string): T[] {
+    if (Array.isArray(data)) return data;
+    const list = data[key];
+    return Array.isArray(list) ? list : [];
+}
+
+function serializeRecipePayload(recipe: Partial<Recipe>): Record<string, unknown> {
+    const instructions = recipe.instructions;
+    return {
+        ...recipe,
+        instructions: Array.isArray(instructions)
+            ? instructions.filter(Boolean).join('\n')
+            : instructions ?? '',
+        image: recipe.image?.url ? recipe.image : null,
+    };
+}
 
 // ============================================================================
 // TYPES (Local interfaces for component state)
@@ -51,6 +71,9 @@ interface Ingredient {
     name: string;
     quantity: number;
     unit: string;
+    unit_kind?: string;
+    base_unit?: string;
+    default_display_unit?: string;
 }
 
 // Default folders that always exist (created on backend if not present)
@@ -60,6 +83,8 @@ export default function RecipeManagerScreen() {
     const navigation = useNavigation();
     const route = useRoute();
     const recipeIdParam = (route.params as { recipeId?: string } | undefined)?.recipeId;
+    const { userSettings } = usePantry();
+    const measurementSystem = (userSettings.measurement_unit === 'imperial' ? 'imperial' : 'metric') as MeasurementSystem;
 
     // ========================================================================
     // STATE - Data from API
@@ -132,7 +157,12 @@ export default function RecipeManagerScreen() {
         try {
             const response = await recipeApi.list();
             if (response.success && response.data) {
-                setRecipes(response.data);
+                const data = response.data as Recipe[] | { recipes?: Recipe[] };
+                setRecipes(
+                    unwrapListResponse(data, 'recipes').map((recipe) =>
+                        normalizeRecipe(recipe as unknown as Record<string, unknown>)
+                    )
+                );
             } else {
                 console.error('[RecipeManager] Failed to fetch recipes:', response.message);
             }
@@ -372,16 +402,24 @@ export default function RecipeManagerScreen() {
         try {
             if (isEditing && selectedRecipe) {
                 // Update existing recipe
-                const response = await recipeApi.update(selectedRecipe.id, {
-                    meal_name: selectedRecipe.meal_name,
-                    ingredients: selectedRecipe.ingredients,
-                    folder_id: selectedRecipe.folder_id,
-                    instructions: selectedRecipe.instructions,
-                    image: selectedRecipe.image,
-                });
+                const response = await recipeApi.update(
+                    selectedRecipe.id,
+                    serializeRecipePayload({
+                        meal_name: selectedRecipe.meal_name,
+                        ingredients: selectedRecipe.ingredients,
+                        folder_id: selectedRecipe.folder_id,
+                        instructions: selectedRecipe.instructions,
+                        image: selectedRecipe.image,
+                    }) as Partial<Recipe>
+                );
 
                 if (response.success && response.data) {
-                    setRecipes(recipes.map((r) => (r.id === selectedRecipe.id ? response.data! : r)));
+                    const raw = response.data as unknown;
+                    const payload = (raw && typeof raw === 'object' && 'recipe' in (raw as object)
+                        ? (raw as { recipe: Record<string, unknown> }).recipe
+                        : raw) as Record<string, unknown>;
+                    const saved = normalizeRecipe(payload);
+                    setRecipes(recipes.map((r) => (r.id === selectedRecipe.id ? saved : r)));
                     setSelectedRecipe(null);
                     setIsEditing(false);
                 } else {
@@ -389,18 +427,22 @@ export default function RecipeManagerScreen() {
                 }
             } else {
                 // Create new recipe
-                const recipeData: Partial<Recipe> = {
+                const recipeData = serializeRecipePayload({
                     meal_name: newRecipe.meal_name,
                     ingredients: newRecipe.ingredients,
                     folder_id: currentFolder?.id || newRecipe.folder_id,
                     instructions: newRecipe.instructions || [],
                     image: newRecipe.image || null,
-                };
+                }) as Partial<Recipe>;
 
                 const response = await recipeApi.create(recipeData);
 
                 if (response.success && response.data) {
-                    setRecipes([...recipes, response.data]);
+                    const raw = response.data as unknown;
+                    const payload = (raw && typeof raw === 'object' && 'recipe' in (raw as object)
+                        ? (raw as { recipe: Record<string, unknown> }).recipe
+                        : raw) as Record<string, unknown>;
+                    setRecipes([...recipes, normalizeRecipe(payload)]);
                     // Reset form
                     setNewRecipe({
                         meal_name: '',
@@ -652,28 +694,31 @@ export default function RecipeManagerScreen() {
      * Ingredient row component for forms
      */
     const IngredientRow = ({ item, index }: { item: Ingredient; index: number }) => (
-        <View className="flex-row items-center mb-2 gap-2">
-            <TextInput
-                value={item.name}
-                onChangeText={(text) => handleUpdateIngredient(index, 'name', text)}
-                placeholder="Ingredient name"
-                className="flex-1 p-3 border border-gray-200 rounded-lg bg-white"
-            />
-            <TextInput
-                value={item.quantity.toString()}
-                onChangeText={(text) => handleUpdateIngredient(index, 'quantity', text)}
-                keyboardType="numeric"
-                className="w-16 p-3 border border-gray-200 rounded-lg bg-white text-center"
-            />
-            <TextInput
+        <View className="mb-2 gap-2">
+            <View className="flex-row items-center gap-2">
+                <TextInput
+                    value={item.name}
+                    onChangeText={(text) => handleUpdateIngredient(index, 'name', text)}
+                    placeholder="Ingredient name"
+                    className="flex-1 p-3 border border-gray-200 rounded-lg bg-white"
+                />
+                <TextInput
+                    value={item.quantity.toString()}
+                    onChangeText={(text) => handleUpdateIngredient(index, 'quantity', text)}
+                    keyboardType="numeric"
+                    className="w-16 p-3 border border-gray-200 rounded-lg bg-white text-center"
+                />
+                <TouchableOpacity onPress={() => handleRemoveIngredient(index)} className="p-2">
+                    <TrashIcon size={18} color="#ef4444" />
+                </TouchableOpacity>
+            </View>
+            <UnitSelect
+                kind={preferredUnitForIngredient(item, measurementSystem).kind}
                 value={item.unit}
-                onChangeText={(text) => handleUpdateIngredient(index, 'unit', text)}
-                placeholder="Unit"
-                className="w-16 p-3 border border-gray-200 rounded-lg bg-white"
+                onChange={(unit) => handleUpdateIngredient(index, 'unit', unit)}
+                measurementSystem={measurementSystem}
+                preferSystemUnits
             />
-            <TouchableOpacity onPress={() => handleRemoveIngredient(index)} className="p-2">
-                <TrashIcon size={18} color="#ef4444" />
-            </TouchableOpacity>
         </View>
     );
 
@@ -849,6 +894,17 @@ export default function RecipeManagerScreen() {
                                         className="w-full p-3 border border-gray-200 rounded-xl mb-4 bg-white"
                                     />
 
+                                    <Text className="text-gray-700 mb-2">Instructions / Steps</Text>
+                                    <TextInput
+                                        value={getInstructionsText()}
+                                        onChangeText={handleInstructionsChange}
+                                        placeholder="Enter cooking instructions (one step per line)"
+                                        multiline
+                                        numberOfLines={6}
+                                        textAlignVertical="top"
+                                        className="w-full p-3 border border-gray-200 rounded-xl mb-4 bg-white min-h-[120px]"
+                                    />
+
                                     <View className="flex-row justify-between items-center mb-2">
                                         <Text className="text-gray-700 font-medium">Ingredients</Text>
                                         <TouchableOpacity
@@ -897,24 +953,46 @@ export default function RecipeManagerScreen() {
                                         {selectedRecipe.meal_name}
                                     </Text>
 
-                                    {selectedRecipe.image && (
+                                    {selectedRecipe.image?.url ? (
                                         <Image
                                             source={{ uri: selectedRecipe.image.url }}
                                             className="w-full h-40 rounded-xl mb-4"
                                         />
-                                    )}
+                                    ) : null}
 
                                     <View className="border-t border-b border-gray-100 py-4">
                                         <Text className="font-medium text-gray-700 mb-2">Ingredients</Text>
                                         {(selectedRecipe.ingredients || []).map((item, index) => (
                                             <View key={index} className="flex-row justify-between py-2">
                                                 <Text className="text-gray-800 capitalize">{item.name}</Text>
-                                                <Text className="text-gray-500">
-                                                    {item.quantity} {item.unit}
-                                                </Text>
+                                                {Number(item.quantity) > 0 ? (
+                                                <QuantityLabel
+                                                    quantity={Number(item.quantity)}
+                                                    unit={item.unit}
+                                                    unitKind={item.unit_kind}
+                                                    baseUnit={item.base_unit}
+                                                    defaultDisplayUnit={item.default_display_unit}
+                                                    measurementSystem={measurementSystem}
+                                                    style={{ color: '#6b7280' }}
+                                                />
+                                                ) : null}
                                             </View>
                                         ))}
                                     </View>
+
+                                    {(selectedRecipe.instructions?.length ?? 0) > 0 && (
+                                        <View className="border-b border-gray-100 py-4">
+                                            <Text className="font-medium text-gray-700 mb-2">Instructions</Text>
+                                            {selectedRecipe.instructions.map((step, index) => (
+                                                <View key={index} className="flex-row mb-3">
+                                                    <View className="w-6 h-6 rounded-full bg-gray-100 items-center justify-center mr-3 mt-0.5">
+                                                        <Text className="text-xs font-medium text-gray-700">{index + 1}</Text>
+                                                    </View>
+                                                    <Text className="flex-1 text-gray-800 leading-5">{step}</Text>
+                                                </View>
+                                            ))}
+                                        </View>
+                                    )}
 
                                     <View className="flex-row gap-2 mt-4">
                                         <TouchableOpacity

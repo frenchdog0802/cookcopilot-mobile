@@ -70,7 +70,7 @@ export default function HomeScreen({
     return (
         <View className="flex-1 bg-white">
             <AppHeader
-                title="ManageEat"
+                title="CookCopilot"
                 showBackButton={false}
                 rightElement={<Settings size={24} color="white" />}
                 onRightPress={handleSettings}

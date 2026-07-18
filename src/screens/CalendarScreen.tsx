@@ -26,8 +26,9 @@ import {
     Check,
 } from 'lucide-react-native';
 
-import { usePantry } from '../contexts/pantryContext';
+import { usePantry, normalizeRecipe } from '../contexts/pantryContext';
 import type { MealPlan, Recipe } from '../types';
+import { recipeApi } from '../api/recipe';
 import { useNavigation } from '@react-navigation/native';
 import AppHeader from '../components/AppHeader';
 
@@ -40,7 +41,7 @@ interface CalendarProps {
 export default function CalendarScreen({ onBack }: CalendarProps = {}) {
     const navigation = useNavigation();
     const handleBack = onBack || (() => navigation.goBack());
-    const { addMealPlan, deleteMealPlan, fetchAllMealPlans, fetchAllRecipes } = usePantry();
+    const { addMealPlan, deleteMealPlan, fetchAllMealPlans, fetchAllRecipes, confirmMealPlan, skipMealPlan } = usePantry();
 
     const [recipes, setRecipes] = useState<Recipe[]>([]);
     const [mealPlans, setMealPlans] = useState<MealPlan[]>([]);
@@ -178,6 +179,43 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
         }
     };
 
+    const canActOnMeal = (item: MealPlan) =>
+        !item.status || item.status === 'PLANNED' || item.status === 'PENDING_CONFIRM';
+
+    const pendingMeals = mealPlans.filter((m) => m.status === 'PENDING_CONFIRM');
+
+    const handleConfirmMeal = async (item: MealPlan) => {
+        const response = await confirmMealPlan(item.id);
+        if (response.success && response.data) {
+            setMealPlans((prev) =>
+                prev.map((mp) => (mp.id === item.id ? { ...mp, status: 'CONFIRMED' } : mp))
+            );
+            const shortages = response.data.shortages || [];
+            if (shortages.length > 0) {
+                const summary = shortages
+                    .slice(0, 3)
+                    .map((s) => `${s.name} (had ${s.available}${s.unit}, needed ${s.needed}${s.unit})`)
+                    .join('\n');
+                Alert.alert(
+                    'Confirmed with pantry shortfall',
+                    `Pantry was updated (clamped at 0).\n\n${summary}\n\nYou can adjust stock in Pantry.`
+                );
+            } else {
+                Alert.alert('Meal confirmed', `${item.meal_name} — pantry updated.`);
+            }
+        }
+    };
+
+    const handleSkipMeal = async (item: MealPlan) => {
+        const response = await skipMealPlan(item.id);
+        if (response.success) {
+            setMealPlans((prev) =>
+                prev.map((mp) => (mp.id === item.id ? { ...mp, status: 'SKIPPED' } : mp))
+            );
+            Alert.alert('Skipped', `${item.meal_name} — no pantry change.`);
+        }
+    };
+
     // ──────────────────────────────────────────────────────────────
     // Render
     // ──────────────────────────────────────────────────────────────
@@ -224,6 +262,42 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
             </View>
 
             <ScrollView className="flex-1 px-4 pt-3">
+                {pendingMeals.length > 0 && (
+                    <View className="mb-4 bg-orange-50 border border-orange-200 rounded-2xl p-3">
+                        <Text className="text-sm font-semibold text-gray-800 mb-2">
+                            {pendingMeals.length === 1
+                                ? `Did you cook ${pendingMeals[0].meal_name}?`
+                                : `${pendingMeals.length} meals waiting for confirmation`}
+                        </Text>
+                        {pendingMeals.map((item) => (
+                            <View
+                                key={item.id}
+                                className="flex-row items-center justify-between bg-white rounded-xl px-3 py-2 mb-2 border border-orange-100"
+                            >
+                                <View className="flex-1 mr-2">
+                                    <Text className="font-medium text-gray-800" numberOfLines={1}>
+                                        {item.meal_name}
+                                    </Text>
+                                    <Text className="text-xs text-gray-500">{item.serving_date}</Text>
+                                </View>
+                                <View className="flex-row gap-2">
+                                    <TouchableOpacity
+                                        onPress={() => handleConfirmMeal(item)}
+                                        className="bg-red-500 px-3 py-1.5 rounded-lg"
+                                    >
+                                        <Text className="text-white text-xs font-medium">Done</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        onPress={() => handleSkipMeal(item)}
+                                        className="border border-gray-300 px-3 py-1.5 rounded-lg"
+                                    >
+                                        <Text className="text-gray-600 text-xs font-medium">Skip</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        ))}
+                    </View>
+                )}
                 {viewMode === 'calendar' && (
                     <>
                         {/* Month Navigation */}
@@ -310,26 +384,80 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                                         {byType[type].map((item) => (
                                             <TouchableOpacity
                                                 key={item.id}
-                                                onPress={() => {
-                                                    const recipe = recipes.find((r) => r.id === item.recipe_id);
-                                                    if (recipe) {
-                                                        setSelectedRecipeDetail(recipe);
-                                                        setShowRecipeDetail(true);
+                                                onPress={async () => {
+                                                    const recipeId = String(item.recipe_id ?? '').trim();
+                                                    let recipe = recipes.find((r) => String(r.id) === recipeId) ?? null;
+
+                                                    if (!recipe && recipeId) {
+                                                        try {
+                                                            const response = await recipeApi.get(recipeId);
+                                                            if (response.success && response.data) {
+                                                                const raw = response.data as unknown;
+                                                                const payload = (raw && typeof raw === 'object' && 'recipe' in (raw as object)
+                                                                    ? (raw as { recipe: Record<string, unknown> }).recipe
+                                                                    : raw) as Record<string, unknown>;
+                                                                recipe = normalizeRecipe(payload);
+                                                                setRecipes((prev) =>
+                                                                    prev.some((r) => r.id === recipe!.id) ? prev : [...prev, recipe!]
+                                                                );
+                                                            }
+                                                        } catch (err) {
+                                                            console.error('Failed to load recipe for meal plan:', err);
+                                                        }
                                                     }
+
+                                                    setSelectedRecipeDetail(
+                                                        recipe ?? {
+                                                            id: recipeId,
+                                                            meal_name: item.meal_name || 'Recipe',
+                                                            folder_id: '',
+                                                            instructions: [],
+                                                            ingredients: [],
+                                                            image: null,
+                                                        }
+                                                    );
+                                                    setShowRecipeDetail(true);
                                                 }}
                                                 className="bg-gray-50 p-4 rounded-xl mb-2.5 border border-gray-200"
                                             >
                                                 <View className="flex-row justify-between items-center">
-                                                    <Text className="font-medium text-gray-800 flex-1">{item.meal_name}</Text>
+                                                    <View className="flex-1 mr-2">
+                                                        <Text className="font-medium text-gray-800">{item.meal_name}</Text>
+                                                        {item.status && item.status !== 'PLANNED' && (
+                                                            <Text className="text-xs text-gray-500 mt-0.5">
+                                                                {item.status === 'PENDING_CONFIRM' && 'Awaiting confirmation'}
+                                                                {item.status === 'CONFIRMED' && 'Cooked'}
+                                                                {item.status === 'SKIPPED' && 'Skipped'}
+                                                            </Text>
+                                                        )}
+                                                    </View>
 
-                                                    <TouchableOpacity
-                                                        onPress={() => {
-                                                            setRecipeToDelete(item);
-                                                            setShowDeleteConfirm(true);
-                                                        }}
-                                                    >
-                                                        <Trash2 size={20} color="#ef4444" />
-                                                    </TouchableOpacity>
+                                                    <View className="flex-row items-center">
+                                                        {canActOnMeal(item) && (
+                                                            <>
+                                                                <TouchableOpacity
+                                                                    onPress={() => handleConfirmMeal(item)}
+                                                                    className="p-2 mr-1"
+                                                                >
+                                                                    <Check size={20} color="#16a34a" />
+                                                                </TouchableOpacity>
+                                                                <TouchableOpacity
+                                                                    onPress={() => handleSkipMeal(item)}
+                                                                    className="p-2 mr-1"
+                                                                >
+                                                                    <X size={20} color="#6b7280" />
+                                                                </TouchableOpacity>
+                                                            </>
+                                                        )}
+                                                        <TouchableOpacity
+                                                            onPress={() => {
+                                                                setRecipeToDelete(item);
+                                                                setShowDeleteConfirm(true);
+                                                            }}
+                                                        >
+                                                            <Trash2 size={20} color="#ef4444" />
+                                                        </TouchableOpacity>
+                                                    </View>
                                                 </View>
                                             </TouchableOpacity>
                                         ))}
@@ -468,15 +596,27 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                                                                 <Text className="text-xs text-gray-500 capitalize">{item.meal_type}</Text>
                                                             </View>
                                                         </View>
-                                                        <TouchableOpacity
-                                                            onPress={() => {
-                                                                setRecipeToDelete(item);
-                                                                setShowDeleteConfirm(true);
-                                                            }}
-                                                            className="p-2"
-                                                        >
-                                                            <Trash2 size={16} color="#ef4444" />
-                                                        </TouchableOpacity>
+                                                        <View className="flex-row items-center">
+                                                            {canActOnMeal(item) && (
+                                                                <>
+                                                                    <TouchableOpacity onPress={() => handleConfirmMeal(item)} className="p-2">
+                                                                        <Check size={16} color="#16a34a" />
+                                                                    </TouchableOpacity>
+                                                                    <TouchableOpacity onPress={() => handleSkipMeal(item)} className="p-2">
+                                                                        <X size={16} color="#6b7280" />
+                                                                    </TouchableOpacity>
+                                                                </>
+                                                            )}
+                                                            <TouchableOpacity
+                                                                onPress={() => {
+                                                                    setRecipeToDelete(item);
+                                                                    setShowDeleteConfirm(true);
+                                                                }}
+                                                                className="p-2"
+                                                            >
+                                                                <Trash2 size={16} color="#ef4444" />
+                                                            </TouchableOpacity>
+                                                        </View>
                                                     </View>
                                                 ))}
                                             </View>
@@ -623,8 +763,81 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                 </View>
             </Modal>
 
-            {/* Recipe Detail Modal (optional) */}
-            {/* You can implement it similarly as bottom sheet */}
+            {/* Recipe Detail Modal */}
+            <Modal
+                visible={showRecipeDetail}
+                transparent
+                animationType="slide"
+                onRequestClose={() => {
+                    setShowRecipeDetail(false);
+                    setSelectedRecipeDetail(null);
+                }}
+            >
+                <View className="flex-1 bg-black/50 justify-end">
+                    <View className="bg-white rounded-t-3xl max-h-[85%]">
+                        <View className="p-4 border-b border-gray-100 flex-row justify-between items-start">
+                            <Text className="text-xl font-bold text-gray-800 flex-1 mr-3">
+                                {selectedRecipeDetail?.meal_name || 'Recipe'}
+                            </Text>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setShowRecipeDetail(false);
+                                    setSelectedRecipeDetail(null);
+                                }}
+                                className="p-1"
+                            >
+                                <X size={24} color="#6b7280" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView className="px-4 py-4">
+                            {(selectedRecipeDetail?.ingredients?.length ?? 0) > 0 ? (
+                                <View className="mb-6">
+                                    <Text className="text-lg font-semibold text-gray-800 mb-3">Ingredients</Text>
+                                    {selectedRecipeDetail!.ingredients.map((ing, index) => (
+                                        <View key={index} className="flex-row justify-between py-2 border-b border-gray-100">
+                                            <Text className="text-gray-800 capitalize flex-1">{ing.name}</Text>
+                                            <Text className="text-gray-500">
+                                                {ing.quantity} {ing.unit}
+                                            </Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            ) : (
+                                <Text className="text-gray-500 mb-6">No ingredients listed for this recipe.</Text>
+                            )}
+
+                            <View className="mb-8">
+                                <Text className="text-lg font-semibold text-gray-800 mb-3">Instructions</Text>
+                                {(selectedRecipeDetail?.instructions?.length ?? 0) > 0 ? (
+                                    selectedRecipeDetail!.instructions.map((step, index) => (
+                                        <View key={index} className="flex-row mb-3">
+                                            <View className="w-6 h-6 rounded-full bg-orange-100 items-center justify-center mr-3 mt-0.5">
+                                                <Text className="text-xs font-medium text-orange-700">{index + 1}</Text>
+                                            </View>
+                                            <Text className="flex-1 text-gray-800 leading-5">{step}</Text>
+                                        </View>
+                                    ))
+                                ) : (
+                                    <Text className="text-gray-500">No instructions available for this recipe.</Text>
+                                )}
+                            </View>
+                        </ScrollView>
+
+                        <View className="p-4 border-t border-gray-100">
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setShowRecipeDetail(false);
+                                    setSelectedRecipeDetail(null);
+                                }}
+                                className="bg-gray-100 py-3 rounded-xl"
+                            >
+                                <Text className="text-center text-gray-800 font-medium">Close</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }

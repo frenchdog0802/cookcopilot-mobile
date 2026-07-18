@@ -18,6 +18,8 @@ import { usePantry } from '../contexts/pantryContext';
 import useSearchIngredients from '../hooks/useSearchIngredient';
 import { PantryItem, IngredientEntry } from '../types';
 import AppHeader from '../components/AppHeader';
+import { UnitSelect, QuantityLabel, preferredUnitForIngredient } from '../components/UnitSelect';
+import type { MeasurementSystem } from '../utils/units';
 
 interface PantryInventoryProps {
     onBack?: () => void;
@@ -31,8 +33,10 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
         removePantryItem,
         ingredients,
         fetchAllPantryItems,
+        userSettings,
     } = usePantry();
 
+    const measurementSystem = (userSettings.measurement_unit === 'imperial' ? 'imperial' : 'metric') as MeasurementSystem;
     const [pantryItems, setPantryItems] = useState(oriPantryItems);
     const [searchQuery, setSearchQuery] = useState('');
     const [isAddingItem, setIsAddingItem] = useState(false);
@@ -92,7 +96,7 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
 
     const renderItem = ({ item }: { item: PantryItem }) => (
         <View className="flex-row items-center p-3 bg-white rounded-xl mb-2 border border-gray-100">
-            {/* Name & Unit */}
+            {/* Name */}
             <View className="flex-1 mr-3">
                 <Text
                     className="font-semibold text-gray-800 capitalize"
@@ -100,9 +104,6 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
                 >
                     {item.name}
                 </Text>
-                {item.unit ? (
-                    <Text className="text-xs text-gray-500">{item.unit}</Text>
-                ) : null}
             </View>
 
             {/* Quantity Controls */}
@@ -114,7 +115,15 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
                     <MinusIcon size={16} color="#374151" />
                 </TouchableOpacity>
 
-                <Text className="text-lg font-bold w-12 text-center">{item.quantity}</Text>
+                <QuantityLabel
+                    quantity={item.quantity}
+                    unit={item.unit}
+                    unitKind={item.unit_kind}
+                    baseUnit={item.base_unit}
+                    defaultDisplayUnit={item.default_display_unit}
+                    measurementSystem={measurementSystem}
+                    style={{ width: 72, textAlign: 'center', fontWeight: '700', fontSize: 14 }}
+                />
 
                 <TouchableOpacity
                     onPress={() => handleUpdateQuantity(item, 0.5)}
@@ -180,7 +189,7 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
                                                 setNewItem({
                                                     name: i.name,
                                                     quantity: 1,
-                                                    unit: i.default_unit || '',
+                                                    unit: preferredUnitForIngredient(i, measurementSystem).unit,
                                                 });
                                                 setShowDropdown(false);
                                             }}
@@ -193,15 +202,20 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
                             </View>
                         )}
 
-                        <TextInput
-                            placeholder="Unit (g, ml)"
-                            value={newItem.unit}
-                            onChangeText={unit =>
-                                setNewItem({ ...newItem, unit })
-                            }
-                            className="border border-gray-200 rounded-lg p-2 mb-3"
-                        />
-
+                        <View className="mb-3">
+                            <UnitSelect
+                                kind={preferredUnitForIngredient(
+                                    ingredients.find(x => x.name.toLowerCase() === newItem.name.toLowerCase()) || {
+                                        default_unit: newItem.unit,
+                                    },
+                                    measurementSystem,
+                                ).kind}
+                                value={newItem.unit}
+                                onChange={unit => setNewItem({ ...newItem, unit })}
+                                measurementSystem={measurementSystem}
+                                preferSystemUnits
+                            />
+                        </View>
                         <View className="flex-row gap-2">
                             <TouchableOpacity
                                 onPress={() => setIsAddingItem(false)}

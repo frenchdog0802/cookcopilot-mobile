@@ -4,6 +4,8 @@ import { usePantry } from '../contexts/pantryContext';
 import { PlusIcon, MinusIcon, CheckIcon, SearchIcon, TrashIcon, XIcon } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import AppHeader from '../components/AppHeader';
+import { UnitSelect, QuantityLabel, preferredUnitForIngredient } from '../components/UnitSelect';
+import type { MeasurementSystem } from '../utils/units';
 
 interface ShoppingListItem {
     id: string;
@@ -11,6 +13,9 @@ interface ShoppingListItem {
     quantity: number;
     unit: string;
     checked: boolean;
+    unit_kind?: string;
+    base_unit?: string;
+    default_display_unit?: string;
 }
 
 export default function ShoppingListScreen() {
@@ -18,15 +23,20 @@ export default function ShoppingListScreen() {
     const {
         shoppingList: oriShoppingList,
         fetchAllShoppingListItems,
+        fetchAllPantryItems,
         updateShoppingListItem,
         addShoppingListItem,
+        ingredients,
+        userSettings,
     } = usePantry();
 
+    const measurementSystem = (userSettings.measurement_unit === 'imperial' ? 'imperial' : 'metric') as MeasurementSystem;
     const [shoppingList, setShoppingList] = useState<ShoppingListItem[]>([]);
     const [showMessage, setShowMessage] = useState(false);
     const [message, setMessage] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [isAddingItem, setIsAddingItem] = useState(false);
+    const [isCompletingAll, setIsCompletingAll] = useState(false);
     const [newItem, setNewItem] = useState({
         name: '',
         quantity: '1',
@@ -70,6 +80,34 @@ export default function ShoppingListScreen() {
         }
     };
 
+    const uncheckedCount = useMemo(
+        () => shoppingList.filter(item => !item.checked).length,
+        [shoppingList]
+    );
+
+    const handleCompleteAll = async () => {
+        const unchecked = shoppingList.filter(item => !item.checked);
+        if (unchecked.length === 0 || isCompletingAll) return;
+
+        setIsCompletingAll(true);
+        try {
+            await Promise.all(
+                unchecked.map(item => updateShoppingListItem({ ...item, checked: true }))
+            );
+            setShoppingList(prevList =>
+                prevList.map(listItem =>
+                    listItem.checked ? listItem : { ...listItem, checked: true }
+                )
+            );
+            await fetchAllPantryItems();
+            setMessage(`All ${unchecked.length} item${unchecked.length === 1 ? '' : 's'} purchased!`);
+            setShowMessage(true);
+            setTimeout(() => setShowMessage(false), 2000);
+        } finally {
+            setIsCompletingAll(false);
+        }
+    };
+
     const handleAddItem = async () => {
         if (!newItem.name.trim()) return;
 
@@ -98,7 +136,7 @@ export default function ShoppingListScreen() {
                 </View>
             </TouchableOpacity>
 
-            {/* Name & Unit */}
+            {/* Name & quantity */}
             <View className="flex-1 mr-3">
                 <Text
                     className={`font-medium capitalize ${item.checked ? 'line-through text-gray-400' : 'text-gray-800'}`}
@@ -106,11 +144,15 @@ export default function ShoppingListScreen() {
                 >
                     {item.name}
                 </Text>
-                {item.unit ? (
-                    <Text className={`text-xs ${item.checked ? 'text-gray-300' : 'text-gray-500'}`}>
-                        {item.unit}
-                    </Text>
-                ) : null}
+                <QuantityLabel
+                    quantity={item.quantity}
+                    unit={item.unit}
+                    unitKind={item.unit_kind}
+                    baseUnit={item.base_unit}
+                    defaultDisplayUnit={item.default_display_unit}
+                    measurementSystem={measurementSystem}
+                    style={{ fontSize: 12, color: item.checked ? '#d1d5db' : '#6b7280' }}
+                />
             </View>
 
             {/* Quantity Controls */}
@@ -197,12 +239,20 @@ export default function ShoppingListScreen() {
                                 keyboardType="numeric"
                                 className="flex-1 p-3 border border-gray-200 rounded-lg bg-white"
                             />
-                            <TextInput
-                                placeholder="Unit (g, ml, etc.)"
-                                value={newItem.unit}
-                                onChangeText={(text) => setNewItem({ ...newItem, unit: text })}
-                                className="flex-[2] p-3 border border-gray-200 rounded-lg bg-white"
-                            />
+                            <View className="flex-[2]">
+                                <UnitSelect
+                                    kind={preferredUnitForIngredient(
+                                        ingredients.find(i => i.name.toLowerCase() === newItem.name.toLowerCase()) || {
+                                            default_unit: newItem.unit,
+                                        },
+                                        measurementSystem,
+                                    ).kind}
+                                    value={newItem.unit}
+                                    onChange={unit => setNewItem({ ...newItem, unit })}
+                                    measurementSystem={measurementSystem}
+                                    preferSystemUnits
+                                />
+                            </View>
                         </View>
 
                         <View className="flex-row gap-2">
@@ -227,8 +277,27 @@ export default function ShoppingListScreen() {
 
                 {/* Shopping List */}
                 <View className="bg-white rounded-xl overflow-hidden flex-1">
-                    <View className="p-4 border-b border-gray-100 bg-gray-50">
+                    <View className="p-4 border-b border-gray-100 bg-gray-50 flex-row items-center justify-between">
                         <Text className="font-semibold text-gray-800">Items to Buy</Text>
+                        <TouchableOpacity
+                            onPress={handleCompleteAll}
+                            disabled={uncheckedCount === 0 || isCompletingAll}
+                            className={`flex-row items-center px-3 py-1.5 rounded-lg ${
+                                uncheckedCount === 0 || isCompletingAll ? 'bg-gray-200' : 'bg-green-600'
+                            }`}
+                        >
+                            <CheckIcon
+                                size={14}
+                                color={uncheckedCount === 0 || isCompletingAll ? '#9ca3af' : 'white'}
+                            />
+                            <Text
+                                className={`ml-1.5 text-sm font-medium ${
+                                    uncheckedCount === 0 || isCompletingAll ? 'text-gray-400' : 'text-white'
+                                }`}
+                            >
+                                {isCompletingAll ? 'Completing…' : 'Complete all'}
+                            </Text>
+                        </TouchableOpacity>
                     </View>
 
                     {filteredItems.length === 0 ? (
