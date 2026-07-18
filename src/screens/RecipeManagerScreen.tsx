@@ -31,7 +31,6 @@ import {
     FolderPlusIcon,
     PencilIcon,
     AlertCircleIcon,
-    PackageIcon,
     CameraIcon,
     ImageIcon,
 } from 'lucide-react-native';
@@ -430,7 +429,7 @@ export default function RecipeManagerScreen() {
                 const recipeData = serializeRecipePayload({
                     meal_name: newRecipe.meal_name,
                     ingredients: newRecipe.ingredients,
-                    folder_id: currentFolder?.id || newRecipe.folder_id,
+                    folder_id: newRecipe.folder_id || currentFolder?.id,
                     instructions: newRecipe.instructions || [],
                     image: newRecipe.image || null,
                 }) as Partial<Recipe>;
@@ -722,13 +721,57 @@ export default function RecipeManagerScreen() {
         </View>
     );
 
+    const handleNavigateBack = () => {
+        if (showAddRecipe) {
+            setShowAddRecipe(false);
+            return;
+        }
+        if (selectedRecipe) {
+            setSelectedRecipe(null);
+            setIsEditing(false);
+            return;
+        }
+        if (currentFolder) {
+            setCurrentFolder(null);
+            return;
+        }
+        navigation.goBack();
+    };
+
+    const renderFolderPicker = (
+        selectedFolderId: string | undefined,
+        onSelect: (folderId: string) => void
+    ) => (
+        <View className="mb-4">
+            <Text className="text-gray-700 mb-2">Folder</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {folders.map((folder) => {
+                    const selected = (selectedFolderId || '') === folder.id;
+                    return (
+                        <TouchableOpacity
+                            key={folder.id}
+                            onPress={() => onSelect(folder.id)}
+                            className={`mr-2 px-3 py-2 rounded-full border ${
+                                selected ? 'bg-orange-500 border-orange-500' : 'bg-white border-gray-200'
+                            }`}
+                        >
+                            <Text className={selected ? 'text-white font-medium' : 'text-gray-700'}>
+                                {folder.name}
+                            </Text>
+                        </TouchableOpacity>
+                    );
+                })}
+            </ScrollView>
+        </View>
+    );
+
     // ========================================================================
     // LOADING STATE
     // ========================================================================
     if (loading) {
         return (
             <View className="flex-1 bg-gray-50">
-                <AppHeader title="Recipe Manager" showBackButton />
+                <AppHeader title="Recipe Manager" showBackButton onBack={handleNavigateBack} />
                 <View className="flex-1 items-center justify-center">
                     <ActivityIndicator size="large" color="#f97316" />
                     <Text className="text-gray-500 mt-4">Loading recipes...</Text>
@@ -743,7 +786,7 @@ export default function RecipeManagerScreen() {
     if (error) {
         return (
             <View className="flex-1 bg-gray-50">
-                <AppHeader title="Recipe Manager" showBackButton />
+                <AppHeader title="Recipe Manager" showBackButton onBack={handleNavigateBack} />
                 <View className="flex-1 items-center justify-center p-6">
                     <AlertCircleIcon size={48} color="#ef4444" />
                     <Text className="text-gray-700 text-lg mt-4 text-center">{error}</Text>
@@ -763,7 +806,7 @@ export default function RecipeManagerScreen() {
     // ========================================================================
     return (
         <View className="flex-1 bg-gray-50">
-            <AppHeader title="Recipe Manager" showBackButton />
+            <AppHeader title="Recipe Manager" showBackButton onBack={handleNavigateBack} />
 
             <ScrollView
                 className="flex-1 p-4"
@@ -773,6 +816,19 @@ export default function RecipeManagerScreen() {
             >
                 {/* Breadcrumb */}
                 <View className="flex-row items-center mb-4">
+                    {currentFolder && (
+                        <TouchableOpacity
+                            onPress={() => setCurrentFolder(null)}
+                            className="mr-2 p-1"
+                            accessibilityLabel="Back to categories"
+                        >
+                            <ChevronRightIcon
+                                size={18}
+                                color="#6b7280"
+                                style={{ transform: [{ rotate: '180deg' }] }}
+                            />
+                        </TouchableOpacity>
+                    )}
                     <TouchableOpacity onPress={() => setCurrentFolder(null)} className="flex-row items-center">
                         <HomeIcon size={16} color="#6b7280" />
                         <Text className="text-gray-600 ml-1">Categories</Text>
@@ -894,6 +950,10 @@ export default function RecipeManagerScreen() {
                                         className="w-full p-3 border border-gray-200 rounded-xl mb-4 bg-white"
                                     />
 
+                                    {renderFolderPicker(selectedRecipe.folder_id, (folderId) =>
+                                        setSelectedRecipe({ ...selectedRecipe, folder_id: folderId })
+                                    )}
+
                                     <Text className="text-gray-700 mb-2">Instructions / Steps</Text>
                                     <TextInput
                                         value={getInstructionsText()}
@@ -1002,10 +1062,6 @@ export default function RecipeManagerScreen() {
                                             <EditIcon size={16} color="#3b82f6" />
                                             <Text className="text-blue-600 font-medium ml-1">Edit Recipe</Text>
                                         </TouchableOpacity>
-                                        <TouchableOpacity className="flex-1 bg-green-50 py-3 rounded-lg flex-row items-center justify-center">
-                                            <PackageIcon size={16} color="#16a34a" />
-                                            <Text className="text-green-600 font-medium ml-1">Add to Pantry</Text>
-                                        </TouchableOpacity>
                                     </View>
                                 </View>
                             )}
@@ -1030,6 +1086,10 @@ export default function RecipeManagerScreen() {
                                 placeholder="Enter meal name"
                                 className="w-full p-3 border border-gray-200 rounded-xl mb-4 bg-white"
                             />
+
+                            {renderFolderPicker(newRecipe.folder_id, (folderId) =>
+                                setNewRecipe({ ...newRecipe, folder_id: folderId })
+                            )}
 
                             {/* Recipe Image */}
                             <Text className="text-gray-700 mb-2">Recipe Image</Text>

@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/authContext';
 import { useAuth0Context } from '../contexts/auth0Context';
 import { usePantry } from '../contexts/pantryContext';
 import { useNavigation } from '@react-navigation/native';
-import { UserIcon, SettingsIcon, PaletteIcon, SaveIcon, CheckIcon } from 'lucide-react-native';
+import { UserIcon, SettingsIcon, SaveIcon, CheckIcon } from 'lucide-react-native';
 import AppHeader from '../components/AppHeader';
 import { userPreferencesApi } from '../api/userPreferences';
 
@@ -15,7 +15,6 @@ export default function SettingsScreen() {
     const navigation = useNavigation();
 
     const [activeTab, setActiveTab] = useState('profile');
-    const [theme, setTheme] = useState('light');
     const [units, setUnits] = useState(userSettings.measurement_unit === 'imperial' ? 'imperial' : 'metric');
     const [name, setName] = useState(user?.name || '');
     const [email, setEmail] = useState(user?.email || '');
@@ -117,24 +116,6 @@ export default function SettingsScreen() {
                                 </Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                className={`flex-1 flex-row items-center justify-center py-4 ${activeTab === 'appearance' ? 'border-b-2 border-orange-500' : ''}`}
-                                onPress={() => setActiveTab('appearance')}
-                            >
-                                <PaletteIcon size={16} color={activeTab === 'appearance' ? '#f97316' : '#6b7280'} />
-                                <Text className={`ml-1 text-sm font-medium ${activeTab === 'appearance' ? 'text-orange-600' : 'text-gray-600'}`}>
-                                    Theme
-                                </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                className={`flex-1 flex-row items-center justify-center py-4 ${activeTab === 'appearance' ? 'border-b-2 border-orange-500' : ''}`}
-                                onPress={() => setActiveTab('appearance')}
-                            >
-                                <PaletteIcon size={16} color={activeTab === 'appearance' ? '#f97316' : '#6b7280'} />
-                                <Text className={`ml-1 text-sm font-medium ${activeTab === 'appearance' ? 'text-orange-600' : 'text-gray-600'}`}>
-                                    Theme
-                                </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
                                 className={`flex-1 flex-row items-center justify-center py-4`}
                                 onPress={() => navigation.navigate('Subscription' as never)}
                             >
@@ -208,38 +189,6 @@ export default function SettingsScreen() {
                                     {errorMessage ? (
                                         <Text className="text-red-500 text-sm mt-2">{errorMessage}</Text>
                                     ) : null}
-                                </View>
-                            )}
-
-                            {activeTab === 'appearance' && (
-                                <View>
-                                    <Text className="text-lg font-semibold text-gray-800 mb-4">
-                                        Theme Settings
-                                    </Text>
-                                    <View className="space-y-2">
-                                        <RadioButton
-                                            selected={theme === 'light'}
-                                            onPress={() => setTheme('light')}
-                                            label="Light Mode"
-                                        />
-                                        <RadioButton
-                                            selected={theme === 'dark'}
-                                            onPress={() => setTheme('dark')}
-                                            label="Dark Mode"
-                                        />
-                                        <RadioButton
-                                            selected={theme === 'system'}
-                                            onPress={() => setTheme('system')}
-                                            label="System Default"
-                                        />
-                                    </View>
-                                    <TouchableOpacity
-                                        onPress={handleSave}
-                                        className="bg-orange-500 py-3 px-4 rounded-lg flex-row items-center justify-center mt-4"
-                                    >
-                                        <SaveIcon size={18} color="white" />
-                                        <Text className="text-white font-medium ml-2">Save Changes</Text>
-                                    </TouchableOpacity>
                                 </View>
                             )}
                         </View>

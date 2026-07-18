@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import {
     View,
     Text,
@@ -13,15 +13,11 @@ import {
 } from 'react-native';
 import {
     SendIcon,
-    SaveIcon,
     RefreshCwIcon,
     ShoppingCartIcon,
-    ChevronDownIcon,
-    TrashIcon,
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { usePantry } from '../contexts/pantryContext';
-import { RecipeSuggestion, Recipe } from '../types';
 import AppHeader from '../components/AppHeader';
 import ChatMessageContent from '../components/ChatMessageContent';
 import { chatApi, ChatResponseData, ChatResponseType, HistoryMessage } from '../api/chat';
@@ -74,7 +70,6 @@ const SUGGESTED_PROMPTS = [
 export default function AICookingAssistantScreen() {
     const navigation = useNavigation();
     const {
-        addRecipe,
         fetchAllRecipes,
         fetchAllShoppingListItems,
         fetchAllPantryItems,
@@ -85,8 +80,6 @@ export default function AICookingAssistantScreen() {
     const [input, setInput] = useState('');
     const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
     const [isTyping, setIsTyping] = useState(false);
-    const [savedRecipes, setSavedRecipes] = useState<RecipeSuggestion[]>([]);
-    const [showSaved, setShowSaved] = useState(false);
     const [addingToMenuRecipeId, setAddingToMenuRecipeId] = useState<string | null>(null);
 
     useEffect(() => {
@@ -193,11 +186,23 @@ export default function AICookingAssistantScreen() {
     const handleAddCreatedRecipeToMenu = async (recipeId: string) => {
         setAddingToMenuRecipeId(recipeId);
         try {
-            await mealPlanApi.create({ recipe_id: recipeId, meal_type: 'dinner' });
-            Alert.alert('Success', 'Recipe added to your dinner menu.');
+            const servingDate = new Date().toISOString().slice(0, 10);
+            const response = await mealPlanApi.create({
+                recipe_id: recipeId,
+                meal_type: 'dinner',
+                serving_date: servingDate,
+            });
+            if (!response.success) {
+                throw new Error(response.message || "Failed to add recipe to today's dinner");
+            }
+            await Promise.all([fetchAllMealPlans(), fetchAllRecipes()]);
+            Alert.alert(
+                "Added to today's dinner",
+                `On the calendar for ${servingDate}. Also filed under Dinner.`
+            );
         } catch (error) {
             console.error(error);
-            Alert.alert('Error', 'Could not add recipe to menu.');
+            Alert.alert('Error', "Could not add recipe to today's dinner.");
         } finally {
             setAddingToMenuRecipeId(null);
         }
@@ -232,24 +237,6 @@ export default function AICookingAssistantScreen() {
         });
     };
 
-    const handleSaveRecipe = (recipe: RecipeSuggestion) => {
-        setSavedRecipes((prev) => [...prev, { ...recipe, savedAt: Date.now() }]);
-    };
-
-    const handleAddToRecipes = async (recipe: RecipeSuggestion) => {
-        const newRecipe: Recipe = {
-            id: `recipe-${Date.now()}`,
-            folder_id: 'uncategorized',
-            meal_name: recipe.name,
-            ingredients: recipe.ingredients,
-            instructions: recipe.instructions,
-            image: null,
-        };
-
-        await addRecipe(newRecipe);
-        Alert.alert('Success', 'Recipe added to your collection!');
-    };
-
     const handleClearChat = () => {
         setMessages([{
             ...WELCOME_MESSAGE,
@@ -257,7 +244,6 @@ export default function AICookingAssistantScreen() {
             content: "Chat cleared! Tell me what ingredients you have, and I'll suggest some recipes!",
             timestamp: Date.now(),
         }]);
-        setSavedRecipes([]);
     };
 
     const renderMessage = ({ item }: { item: Message }) => {
@@ -307,7 +293,7 @@ export default function AICookingAssistantScreen() {
                                     disabled={addingToMenuRecipeId === item.cardData.recipeId}
                                     className="flex-1 bg-green-50 py-2 rounded-lg items-center"
                                 >
-                                    <Text className="text-green-600 text-sm">Add to Menu</Text>
+                                    <Text className="text-green-600 text-sm">Add to today's dinner</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -411,42 +397,6 @@ export default function AICookingAssistantScreen() {
                 onRightPress={handleClearChat}
             />
 
-            {savedRecipes.length > 0 && (
-                <TouchableOpacity
-                    onPress={() => setShowSaved(!showSaved)}
-                    className="bg-blue-50 px-4 py-3 flex-row items-center justify-between border-b border-blue-100"
-                >
-                    <Text className="text-blue-600 font-medium">
-                        Saved Recipes ({savedRecipes.length})
-                    </Text>
-                    <ChevronDownIcon
-                        size={20}
-                        color="#3b82f6"
-                        style={{ transform: [{ rotate: showSaved ? '180deg' : '0deg' }] }}
-                    />
-                </TouchableOpacity>
-            )}
-
-            {showSaved && (
-                <ScrollView className="max-h-40 bg-white border-b border-gray-200">
-                    {savedRecipes.map((recipe) => (
-                        <View
-                            key={recipe.id}
-                            className="flex-row items-center justify-between px-4 py-3 border-b border-gray-100"
-                        >
-                            <Text className="text-gray-800 flex-1">{recipe.name}</Text>
-                            <TouchableOpacity
-                                onPress={() =>
-                                    setSavedRecipes((prev) => prev.filter((r) => r.id !== recipe.id))
-                                }
-                            >
-                                <TrashIcon size={18} color="#ef4444" />
-                            </TouchableOpacity>
-                        </View>
-                    ))}
-                </ScrollView>
-            )}
-
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 className="flex-1"
@@ -485,7 +435,7 @@ export default function AICookingAssistantScreen() {
                     <View className="flex-row items-center gap-2">
                         <TextInput
                             className="flex-1 bg-gray-100 rounded-xl px-4 py-3"
-                            placeholder="Ask CookCopilot to plan, import, or organize..."
+                            placeholder="Ask LarderMind to plan, import, or organize..."
                             placeholderTextColor="#9ca3af"
                             value={input}
                             onChangeText={setInput}

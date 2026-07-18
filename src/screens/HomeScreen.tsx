@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+﻿import React, { useEffect } from 'react';
 import {
     View,
     Text,
@@ -70,7 +70,7 @@ export default function HomeScreen({
     return (
         <View className="flex-1 bg-white">
             <AppHeader
-                title="CookCopilot"
+                title="LarderMind"
                 showBackButton={false}
                 rightElement={<Settings size={24} color="white" />}
                 onRightPress={handleSettings}
@@ -166,7 +166,7 @@ export default function HomeScreen({
                             >
                                 <ChefHatIcon size={28} color="#dc2626" />
                                 <Text className="ml-3 text-xl font-bold text-red-600">
-                                    Cook with what I have
+                                    Ask AI assistant
                                 </Text>
                             </TouchableOpacity>
                         </View>
