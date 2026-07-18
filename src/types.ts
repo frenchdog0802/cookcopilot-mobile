@@ -1,5 +1,5 @@
 /**
- * Shared types for the PantryApp mobile application
+ * Shared types for the LarderMind mobile application
  * Migrated from Diet_APP web client
  */
 

@@ -25,7 +25,7 @@ import { Platform, Alert } from 'react-native';
 // PRODUCT IDS - Must match App Store Connect / Play Console
 // ============================================================================
 export const PRODUCT_IDS = {
-    ios: ['com.pantry.pro.monthly', 'com.pantry.pro.yearly'],
+    ios: ['com.lardermind.pro.monthly', 'com.lardermind.pro.yearly'],
     android: ['pantry_pro_monthly', 'pantry_pro_yearly'],
 };
 
@@ -56,7 +56,7 @@ export type PurchaseState = 'idle' | 'pending' | 'success' | 'error' | 'cancelle
 // ============================================================================
 const MOCK_PRODUCTS: IAPProduct[] = [
     {
-        productId: 'com.pantry.pro.monthly',
+        productId: 'com.lardermind.pro.monthly',
         title: 'Pro Monthly',
         description: 'Unlock all premium features with monthly billing',
         price: '4.99',
@@ -64,7 +64,7 @@ const MOCK_PRODUCTS: IAPProduct[] = [
         localizedPrice: '$4.99',
     },
     {
-        productId: 'com.pantry.pro.yearly',
+        productId: 'com.lardermind.pro.yearly',
         title: 'Pro Yearly',
         description: 'Unlock all premium features with yearly billing (save 20%)',
         price: '39.99',

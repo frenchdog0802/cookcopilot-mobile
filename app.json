@@ -1,4 +1,4 @@
-﻿{
+{
   "expo": {
     "scheme": "lardermind",
     "name": "LarderMind",
@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.cookcopilot.app",
+      "bundleIdentifier": "com.lardermind.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -27,7 +27,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.cookcopilot.app"
+      "package": "com.lardermind.app"
     },
     "web": {
       "favicon": "./assets/favicon.png",
