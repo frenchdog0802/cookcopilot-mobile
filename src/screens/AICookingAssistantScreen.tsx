@@ -9,7 +9,9 @@ import {
     KeyboardAvoidingView,
     Platform,
     ActivityIndicator,
-    Alert
+    Alert,
+    NativeSyntheticEvent,
+    TextInputContentSizeChangeEventData,
 } from 'react-native';
 import {
     SendIcon,
@@ -17,11 +19,16 @@ import {
     ShoppingCartIcon,
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePantry } from '../contexts/pantryContext';
 import AppHeader from '../components/AppHeader';
 import ChatMessageContent from '../components/ChatMessageContent';
 import { chatApi, ChatResponseData, ChatResponseType, HistoryMessage } from '../api/chat';
 import { mealPlanApi } from '../api/mealPlan';
+
+/** Matches ChatGPT / Claude-style mobile composers: comfortable single line, grows with content. */
+const INPUT_MIN_HEIGHT = 44;
+const INPUT_MAX_HEIGHT = 140;
 
 interface ResponseCardData {
     recipeId?: string;
@@ -69,6 +76,7 @@ const SUGGESTED_PROMPTS = [
 
 export default function AICookingAssistantScreen() {
     const navigation = useNavigation();
+    const insets = useSafeAreaInsets();
     const {
         fetchAllRecipes,
         fetchAllShoppingListItems,
@@ -78,9 +86,22 @@ export default function AICookingAssistantScreen() {
     const flatListRef = useRef<FlatList>(null);
 
     const [input, setInput] = useState('');
+    const [inputHeight, setInputHeight] = useState(INPUT_MIN_HEIGHT);
     const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
     const [isTyping, setIsTyping] = useState(false);
     const [addingToMenuRecipeId, setAddingToMenuRecipeId] = useState<string | null>(null);
+
+    const canSend = input.trim().length > 0 && !isTyping;
+
+    const handleInputContentSizeChange = (
+        event: NativeSyntheticEvent<TextInputContentSizeChangeEventData>,
+    ) => {
+        const next = Math.min(
+            INPUT_MAX_HEIGHT,
+            Math.max(INPUT_MIN_HEIGHT, event.nativeEvent.contentSize.height),
+        );
+        setInputHeight(next);
+    };
 
     useEffect(() => {
         const loadHistory = async () => {
@@ -149,6 +170,7 @@ export default function AICookingAssistantScreen() {
 
         setMessages((prev) => [...prev, userMessage]);
         setInput('');
+        setInputHeight(INPUT_MIN_HEIGHT);
         setIsTyping(true);
 
         try {
@@ -400,15 +422,16 @@ export default function AICookingAssistantScreen() {
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 className="flex-1"
-                keyboardVerticalOffset={90}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
             >
                 <FlatList
                     ref={flatListRef}
                     data={messages}
                     renderItem={renderMessage}
                     keyExtractor={(item) => item.id}
-                    contentContainerStyle={{ padding: 16 }}
+                    contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
                     onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
+                    keyboardShouldPersistTaps="handled"
                 />
 
                 {isTyping && (
@@ -420,35 +443,65 @@ export default function AICookingAssistantScreen() {
                     </View>
                 )}
 
-                <View className="px-4 py-3 bg-white border-t border-gray-200">
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-2">
+                <View
+                    className="bg-white border-t border-gray-100 px-3 pt-3"
+                    style={{ paddingBottom: Math.max(insets.bottom, 12) }}
+                >
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        className="mb-3"
+                        keyboardShouldPersistTaps="handled"
+                        contentContainerStyle={{ paddingHorizontal: 2 }}
+                    >
                         {SUGGESTED_PROMPTS.map((prompt) => (
                             <TouchableOpacity
                                 key={prompt}
                                 onPress={() => setInput(prompt)}
-                                className="bg-orange-50 px-3 py-1.5 rounded-full mr-2"
+                                className="bg-orange-50 px-3.5 py-2 rounded-full mr-2 border border-orange-100"
                             >
-                                <Text className="text-orange-700 text-xs">{prompt}</Text>
+                                <Text className="text-orange-700 text-sm">{prompt}</Text>
                             </TouchableOpacity>
                         ))}
                     </ScrollView>
-                    <View className="flex-row items-center gap-2">
-                        <TextInput
-                            className="flex-1 bg-gray-100 rounded-xl px-4 py-3"
-                            placeholder="Ask LarderMind to plan, import, or organize..."
-                            placeholderTextColor="#9ca3af"
-                            value={input}
-                            onChangeText={setInput}
-                            onSubmitEditing={handleSend}
-                            returnKeyType="send"
-                        />
-                        <TouchableOpacity
-                            onPress={handleSend}
-                            disabled={!input.trim() || isTyping}
-                            className={`p-3 rounded-xl ${input.trim() && !isTyping ? 'bg-orange-500' : 'bg-gray-200'}`}
-                        >
-                            <SendIcon size={20} color={input.trim() && !isTyping ? 'white' : '#9ca3af'} />
-                        </TouchableOpacity>
+
+                    {/* ChatGPT / Claude-style pill composer */}
+                    <View className="flex-row items-end gap-2.5">
+                        <View className="flex-1 flex-row items-end rounded-[28px] border border-gray-200 bg-gray-50 pl-4 pr-2 py-2 min-h-[56px]">
+                            <TextInput
+                                className="flex-1 text-gray-900"
+                                style={{
+                                    fontSize: 16,
+                                    lineHeight: 22,
+                                    maxHeight: INPUT_MAX_HEIGHT,
+                                    height: Math.max(inputHeight, INPUT_MIN_HEIGHT),
+                                    paddingTop: Platform.OS === 'ios' ? 10 : 8,
+                                    paddingBottom: Platform.OS === 'ios' ? 10 : 8,
+                                    marginRight: 8,
+                                }}
+                                placeholder="Message LarderMind…"
+                                placeholderTextColor="#9ca3af"
+                                value={input}
+                                onChangeText={setInput}
+                                onContentSizeChange={handleInputContentSizeChange}
+                                multiline
+                                textAlignVertical="top"
+                                blurOnSubmit={false}
+                                editable={!isTyping}
+                                returnKeyType="default"
+                            />
+                            <TouchableOpacity
+                                onPress={handleSend}
+                                disabled={!canSend}
+                                accessibilityRole="button"
+                                accessibilityLabel="Send message"
+                                className={`w-11 h-11 rounded-full items-center justify-center mb-0.5 ${
+                                    canSend ? 'bg-orange-500' : 'bg-gray-200'
+                                }`}
+                            >
+                                <SendIcon size={20} color={canSend ? 'white' : '#9ca3af'} />
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             </KeyboardAvoidingView>

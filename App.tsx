@@ -3,7 +3,7 @@ import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import {
   House as HouseIcon,
@@ -156,18 +156,20 @@ function MainTabs() {
 // Main App - Wrapped with Auth0 and IAP Context for subscription support
 function App() {
   return (
-    <Auth0Provider>
-      <AuthProvider>
-        <PantryProvider>
-          <NavigationContainer>
-            <StatusBar style="auto" />
-            <AuthCheck>
-              <RootNavigator />
-            </AuthCheck>
-          </NavigationContainer>
-        </PantryProvider>
-      </AuthProvider>
-    </Auth0Provider>
+    <SafeAreaProvider>
+      <Auth0Provider>
+        <AuthProvider>
+          <PantryProvider>
+            <NavigationContainer>
+              <StatusBar style="auto" />
+              <AuthCheck>
+                <RootNavigator />
+              </AuthCheck>
+            </NavigationContainer>
+          </PantryProvider>
+        </AuthProvider>
+      </Auth0Provider>
+    </SafeAreaProvider>
   );
 }
 
