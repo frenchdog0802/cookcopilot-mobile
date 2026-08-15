@@ -2,7 +2,7 @@
   "expo": {
     "scheme": "lardermind",
     "name": "LarderMind",
-    "slug": "LarderMind",
+    "slug": "PantryApp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -11,7 +11,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#F3F0E8"
     },
     "ios": {
       "supportsTablet": true,
@@ -23,7 +23,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#F3F0E8"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -34,12 +34,14 @@
       "bundler": "metro"
     },
     "plugins": [
-      "react-native-iap"
+      "react-native-iap",
+      "expo-font"
     ],
     "extra": {
       "eas": {
         "projectId": "cf38de84-b63d-4d79-99fa-2dc29373f4d0"
       }
-    }
+    },
+    "owner": "bertjiayu"
   }
 }

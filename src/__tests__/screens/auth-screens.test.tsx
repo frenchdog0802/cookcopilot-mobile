@@ -13,6 +13,8 @@ jest.mock('../../contexts/authContext', () => ({
     useAuth: () => ({
         login: mockLogin,
         signUp: mockSignUp,
+        initializing: false,
+        submitting: false,
         loading: false,
         user: null,
         isAuthenticated: false,

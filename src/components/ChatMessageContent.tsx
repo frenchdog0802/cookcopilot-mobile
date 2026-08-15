@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, TextStyle } from 'react-native';
 import Markdown from 'react-native-markdown-display';
+import { colors } from '../theme/tokens';
 
 interface ChatMessageContentProps {
   content: string;
@@ -16,9 +17,9 @@ export default function ChatMessageContent({
   style,
   isUser = false,
 }: ChatMessageContentProps) {
-  const textColor = isUser ? '#ffffff' : '#1f2937';
-  const mutedBorder = isUser ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.12)';
-  const headerBg = isUser ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.04)';
+  const textColor = isUser ? colors.onHerb : colors.ink;
+  const mutedBorder = isUser ? 'rgba(255,255,255,0.25)' : 'rgba(31,36,32,0.12)';
+  const headerBg = isUser ? 'rgba(255,255,255,0.12)' : 'rgba(31,36,32,0.04)';
 
   const markdownStyles = useMemo(
     () =>
@@ -41,14 +42,14 @@ export default function ChatMessageContent({
         list_item: { color: textColor, marginVertical: 1 },
         hr: { backgroundColor: mutedBorder, height: 1, marginVertical: 10 },
         code_inline: {
-          backgroundColor: isUser ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.06)',
+          backgroundColor: isUser ? 'rgba(255,255,255,0.15)' : 'rgba(31,36,32,0.06)',
           color: textColor,
           borderRadius: 4,
           paddingHorizontal: 4,
           fontSize: 13,
         },
         fence: {
-          backgroundColor: isUser ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.05)',
+          backgroundColor: isUser ? 'rgba(255,255,255,0.12)' : 'rgba(31,36,32,0.05)',
           color: textColor,
           borderRadius: 8,
           padding: 8,

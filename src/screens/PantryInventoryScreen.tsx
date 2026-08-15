@@ -22,6 +22,7 @@ import AskAiEmptyCta from '../components/AskAiEmptyCta';
 import { UnitSelect, QuantityLabel, preferredUnitForIngredient } from '../components/UnitSelect';
 import type { MeasurementSystem } from '../utils/units';
 import { useNavigation } from '@react-navigation/native';
+import { colors } from '../theme/tokens';
 
 interface PantryInventoryProps {
     onBack?: () => void;
@@ -98,11 +99,11 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
     };
 
     const renderItem = ({ item }: { item: PantryItem }) => (
-        <View className="flex-row items-center p-3 bg-white rounded-xl mb-2 border border-gray-100">
+        <View className="flex-row items-center p-3 bg-surface rounded-xl mb-2 border border-line">
             {/* Name */}
             <View className="flex-1 mr-3">
                 <Text
-                    className="font-semibold text-gray-800 capitalize"
+                    className="font-semibold text-ink capitalize"
                     numberOfLines={1}
                 >
                     {item.name}
@@ -113,9 +114,9 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
             <View className="flex-row items-center mr-2">
                 <TouchableOpacity
                     onPress={() => handleUpdateQuantity(item, -0.5)}
-                    className="bg-gray-100 p-2 rounded-lg"
+                    className="bg-linen p-2 rounded-lg border border-line"
                 >
-                    <MinusIcon size={16} color="#374151" />
+                    <MinusIcon size={16} color={colors.ink} />
                 </TouchableOpacity>
 
                 <QuantityLabel
@@ -130,27 +131,27 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
 
                 <TouchableOpacity
                     onPress={() => handleUpdateQuantity(item, 0.5)}
-                    className="bg-red-500 p-2 rounded-lg"
+                    className="bg-herb p-2 rounded-lg"
                 >
-                    <PlusIcon size={16} color="white" />
+                    <PlusIcon size={16} color={colors.onHerb} />
                 </TouchableOpacity>
             </View>
 
             {/* Delete Button */}
             <TouchableOpacity onPress={() => removePantryItem(item.id)} className="p-2">
-                <TrashIcon size={18} color="#ef4444" />
+                <TrashIcon size={18} color={colors.danger} />
             </TouchableOpacity>
         </View>
     );
 
     return (
-        <View className="flex-1 bg-gray-50">
+        <View className="flex-1 bg-linen">
             <AppHeader title="Kitchen Inventory" showBackButton onBack={onBack} />
 
             <ScrollView className="flex-1 p-4">
                 {/* Search */}
-                <View className="flex-row items-center bg-white rounded-xl px-3 mb-4 border border-gray-200">
-                    <SearchIcon size={18} color="#9ca3af" />
+                <View className="flex-row items-center bg-surface rounded-xl px-3 mb-4 border border-line">
+                    <SearchIcon size={18} color={colors.muted} />
                     <TextInput
                         placeholder="Search ingredients..."
                         value={searchQuery}
@@ -163,13 +164,13 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
                 {!isAddingItem ? (
                     <TouchableOpacity
                         onPress={() => setIsAddingItem(true)}
-                        className="bg-white border border-gray-200 rounded-xl p-4 flex-row justify-center items-center mb-4"
+                        className="bg-surface border border-line rounded-xl p-4 flex-row justify-center items-center mb-4"
                     >
-                        <PlusIcon size={18} />
-                        <Text className="ml-2 font-medium">Add New Item</Text>
+                        <PlusIcon size={18} color={colors.ink} />
+                        <Text className="ml-2 font-medium text-ink">Add New Item</Text>
                     </TouchableOpacity>
                 ) : (
-                    <View className="bg-white rounded-xl p-4 mb-4 border border-gray-200">
+                    <View className="bg-surface rounded-xl p-4 mb-4 border border-line">
                         <TextInput
                             placeholder="Item name"
                             value={newItem.name}
@@ -177,11 +178,11 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
                                 setNewItem({ ...newItem, name: text });
                                 setShowDropdown(true);
                             }}
-                            className="border border-gray-200 rounded-lg p-2 mb-2"
+                            className="border border-line rounded-lg p-2 mb-2 bg-linen text-ink"
                         />
 
                         {showDropdown && (
-                            <View className="border border-gray-200 rounded-lg mb-2">
+                            <View className="border border-line rounded-lg mb-2 bg-linen">
                                 {loading ? (
                                     <Text className="p-3 text-center">Loading…</Text>
                                 ) : (
@@ -222,14 +223,14 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
                         <View className="flex-row gap-2">
                             <TouchableOpacity
                                 onPress={() => setIsAddingItem(false)}
-                                className="flex-1 bg-gray-100 p-3 rounded-lg"
+                                className="flex-1 bg-linen border border-line p-3 rounded-lg"
                             >
                                 <Text className="text-center">Cancel</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
                                 onPress={handleAddItem}
-                                className="flex-1 bg-red-500 p-3 rounded-lg"
+                                className="flex-1 bg-herb p-3 rounded-lg"
                             >
                                 <Text className="text-white text-center">Add</Text>
                             </TouchableOpacity>
@@ -239,9 +240,9 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
 
                 {/* List */}
                 {filteredItems.length === 0 ? (
-                    <View className="bg-white rounded-xl p-6 items-center">
-                        <PackageIcon size={32} color="#d1d5db" />
-                        <Text className="text-gray-500 mt-2">
+                    <View className="bg-surface rounded-xl p-6 items-center border border-line">
+                        <PackageIcon size={32} color={colors.line} />
+                        <Text className="text-muted mt-2">
                             No items found
                         </Text>
                         {!searchQuery && (

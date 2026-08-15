@@ -46,6 +46,7 @@ import { recipeApi } from '../api/recipe';
 import { folderApi } from '../api/folder';
 import { Recipe, Folder, ApiResponse } from '../types';
 import { normalizeRecipe, usePantry } from '../contexts/pantryContext';
+import { colors } from '../theme/tokens';
 
 function unwrapListResponse<T>(data: T[] | Record<string, T[] | undefined>, key: string): T[] {
     if (Array.isArray(data)) return data;
@@ -590,39 +591,39 @@ export default function RecipeManagerScreen() {
     const renderFolderCard = ({ item: folder }: { item: Folder }) => (
         <TouchableOpacity
             onPress={() => setCurrentFolder(folder)}
-            className="bg-white rounded-xl p-4 mb-3 shadow-sm border border-gray-100"
+            className="bg-surface rounded-xl p-4 mb-3 border border-line"
         >
             <View className="flex-row items-center justify-between">
                 <View className="flex-row items-center flex-1">
-                    <FolderIcon size={20} color="#f59e0b" />
-                    <Text className="font-medium text-gray-800 ml-2">{folder.name}</Text>
+                    <FolderIcon size={20} color={colors.herb} />
+                    <Text className="font-medium text-ink ml-2">{folder.name}</Text>
                 </View>
                 <View className="flex-row items-center">
-                    <Text className="text-gray-500 text-sm mr-2">
+                    <Text className="text-muted text-sm mr-2">
                         {recipes.filter((r) => r.folder_id === folder.id).length} recipes
                     </Text>
                     <TouchableOpacity
                         onPress={() => setShowFolderActions(showFolderActions === folder.id ? null : folder.id)}
                         className="p-1"
                     >
-                        <MoreVerticalIcon size={18} color="#6b7280" />
+                        <MoreVerticalIcon size={18} color={colors.muted} />
                     </TouchableOpacity>
                 </View>
             </View>
 
             {/* Folder Actions Dropdown */}
             {showFolderActions === folder.id && (
-                <View className="absolute right-2 top-12 bg-white rounded-lg shadow-lg border border-gray-200 z-10 w-36">
+                <View className="absolute right-2 top-12 bg-surface rounded-lg border border-line z-10 w-36">
                     <TouchableOpacity
                         onPress={() => {
                             setEditingFolder(folder);
                             setNewFolderName(folder.name);
                             setShowFolderActions(null);
                         }}
-                        className="flex-row items-center p-3 border-b border-gray-100"
+                        className="flex-row items-center p-3 border-b border-line"
                     >
-                        <PencilIcon size={14} color="#374151" />
-                        <Text className="text-gray-700 ml-2">Rename</Text>
+                        <PencilIcon size={14} color={colors.ink} />
+                        <Text className="text-ink ml-2">Rename</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         onPress={() => {
@@ -630,10 +631,10 @@ export default function RecipeManagerScreen() {
                             setShowAddRecipe(true);
                             setShowFolderActions(null);
                         }}
-                        className="flex-row items-center p-3 border-b border-gray-100"
+                        className="flex-row items-center p-3 border-b border-line"
                     >
-                        <PlusIcon size={14} color="#374151" />
-                        <Text className="text-gray-700 ml-2">Add Recipe</Text>
+                        <PlusIcon size={14} color={colors.ink} />
+                        <Text className="text-ink ml-2">Add Recipe</Text>
                     </TouchableOpacity>
                     {folder.name.toLowerCase() !== 'uncategorized' && (
                         <TouchableOpacity
@@ -644,8 +645,8 @@ export default function RecipeManagerScreen() {
                             }}
                             className="flex-row items-center p-3"
                         >
-                            <TrashIcon size={14} color="#dc2626" />
-                            <Text className="text-red-600 ml-2">Delete</Text>
+                            <TrashIcon size={14} color={colors.danger} />
+                            <Text className="ml-2" style={{ color: colors.danger }}>Delete</Text>
                         </TouchableOpacity>
                     )}
                 </View>
@@ -662,12 +663,12 @@ export default function RecipeManagerScreen() {
                 setSelectedRecipe(recipe);
                 setIsEditing(false);
             }}
-            className="bg-white rounded-xl p-4 mb-3 shadow-sm border border-gray-100"
+            className="bg-surface rounded-xl p-4 mb-3 border border-line"
         >
             <View className="flex-row justify-between items-start">
                 <View className="flex-1">
-                    <Text className="font-medium text-gray-800 text-lg">{recipe.meal_name}</Text>
-                    <Text className="text-gray-500 text-sm mt-1">
+                    <Text className="font-medium text-ink text-lg">{recipe.meal_name}</Text>
+                    <Text className="text-muted text-sm mt-1">
                         {recipe.ingredients?.length || 0} ingredient
                         {(recipe.ingredients?.length || 0) !== 1 ? 's' : ''}
                     </Text>
@@ -680,10 +681,10 @@ export default function RecipeManagerScreen() {
                         }}
                         className="p-2"
                     >
-                        <EditIcon size={18} color="#3b82f6" />
+                        <EditIcon size={18} color={colors.herb} />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => handleDeleteRecipe(recipe.id)} className="p-2">
-                        <TrashIcon size={18} color="#ef4444" />
+                        <TrashIcon size={18} color={colors.danger} />
                     </TouchableOpacity>
                 </View>
             </View>
@@ -700,16 +701,16 @@ export default function RecipeManagerScreen() {
                     value={item.name}
                     onChangeText={(text) => handleUpdateIngredient(index, 'name', text)}
                     placeholder="Ingredient name"
-                    className="flex-1 p-3 border border-gray-200 rounded-lg bg-white"
+                    className="flex-1 p-3 border border-line rounded-lg bg-linen text-ink"
                 />
                 <TextInput
                     value={item.quantity.toString()}
                     onChangeText={(text) => handleUpdateIngredient(index, 'quantity', text)}
                     keyboardType="numeric"
-                    className="w-16 p-3 border border-gray-200 rounded-lg bg-white text-center"
+                    className="w-16 p-3 border border-line rounded-lg bg-linen text-ink text-center"
                 />
                 <TouchableOpacity onPress={() => handleRemoveIngredient(index)} className="p-2">
-                    <TrashIcon size={18} color="#ef4444" />
+                    <TrashIcon size={18} color={colors.danger} />
                 </TouchableOpacity>
             </View>
             <UnitSelect
@@ -744,7 +745,7 @@ export default function RecipeManagerScreen() {
         onSelect: (folderId: string) => void
     ) => (
         <View className="mb-4">
-            <Text className="text-gray-700 mb-2">Folder</Text>
+            <Text className="text-ink mb-2">Folder</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {folders.map((folder) => {
                     const selected = (selectedFolderId || '') === folder.id;
@@ -753,10 +754,10 @@ export default function RecipeManagerScreen() {
                             key={folder.id}
                             onPress={() => onSelect(folder.id)}
                             className={`mr-2 px-3 py-2 rounded-full border ${
-                                selected ? 'bg-orange-500 border-orange-500' : 'bg-white border-gray-200'
+                                selected ? 'bg-herb border-herb' : 'bg-surface border-line'
                             }`}
                         >
-                            <Text className={selected ? 'text-white font-medium' : 'text-gray-700'}>
+                            <Text className={selected ? 'text-white font-medium' : 'text-ink'}>
                                 {folder.name}
                             </Text>
                         </TouchableOpacity>
@@ -771,11 +772,11 @@ export default function RecipeManagerScreen() {
     // ========================================================================
     if (loading) {
         return (
-            <View className="flex-1 bg-gray-50">
+            <View className="flex-1 bg-linen">
                 <AppHeader title="Recipe Manager" showBackButton onBack={handleNavigateBack} />
                 <View className="flex-1 items-center justify-center">
-                    <ActivityIndicator size="large" color="#f97316" />
-                    <Text className="text-gray-500 mt-4">Loading recipes...</Text>
+                    <ActivityIndicator size="large" color={colors.herb} />
+                    <Text className="text-muted mt-4">Loading recipes...</Text>
                 </View>
             </View>
         );
@@ -786,14 +787,14 @@ export default function RecipeManagerScreen() {
     // ========================================================================
     if (error) {
         return (
-            <View className="flex-1 bg-gray-50">
+            <View className="flex-1 bg-linen">
                 <AppHeader title="Recipe Manager" showBackButton onBack={handleNavigateBack} />
                 <View className="flex-1 items-center justify-center p-6">
-                    <AlertCircleIcon size={48} color="#ef4444" />
-                    <Text className="text-gray-700 text-lg mt-4 text-center">{error}</Text>
+                    <AlertCircleIcon size={48} color={colors.danger} />
+                    <Text className="text-ink text-lg mt-4 text-center">{error}</Text>
                     <TouchableOpacity
                         onPress={loadData}
-                        className="mt-6 bg-orange-500 px-6 py-3 rounded-xl"
+                        className="mt-6 bg-herb px-6 py-3 rounded-xl"
                     >
                         <Text className="text-white font-medium">Try Again</Text>
                     </TouchableOpacity>
@@ -806,13 +807,13 @@ export default function RecipeManagerScreen() {
     // MAIN RENDER
     // ========================================================================
     return (
-        <View className="flex-1 bg-gray-50">
+        <View className="flex-1 bg-linen">
             <AppHeader title="Recipe Manager" showBackButton onBack={handleNavigateBack} />
 
             <ScrollView
                 className="flex-1 p-4"
                 refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+                    <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.herb} colors={[colors.herb]} />
                 }
             >
                 {/* Breadcrumb */}
@@ -825,19 +826,19 @@ export default function RecipeManagerScreen() {
                         >
                             <ChevronRightIcon
                                 size={18}
-                                color="#6b7280"
+                                color={colors.muted}
                                 style={{ transform: [{ rotate: '180deg' }] }}
                             />
                         </TouchableOpacity>
                     )}
                     <TouchableOpacity onPress={() => setCurrentFolder(null)} className="flex-row items-center">
-                        <HomeIcon size={16} color="#6b7280" />
-                        <Text className="text-gray-600 ml-1">Categories</Text>
+                        <HomeIcon size={16} color={colors.muted} />
+                        <Text className="text-muted ml-1">Categories</Text>
                     </TouchableOpacity>
                     {currentFolder && (
                         <>
-                            <ChevronRightIcon size={16} color="#9ca3af" />
-                            <Text className="text-gray-800 font-medium ml-1">{currentFolder.name}</Text>
+                            <ChevronRightIcon size={16} color={colors.muted} />
+                            <Text className="text-ink font-medium ml-1">{currentFolder.name}</Text>
                         </>
                     )}
                 </View>
@@ -848,24 +849,24 @@ export default function RecipeManagerScreen() {
                         // Folder View
                         <View>
                             <View className="flex-row justify-between items-center mb-4">
-                                <Text className="text-xl font-bold text-gray-800">Recipe Categories</Text>
+                                <Text className="text-xl font-bold text-ink">Recipe Categories</Text>
                                 <TouchableOpacity
                                     onPress={() => {
                                         setNewFolderName('');
                                         setShowAddFolder(true);
                                     }}
-                                    className="flex-row items-center bg-red-50 px-3 py-2 rounded-lg"
+                                    className="flex-row items-center bg-sage px-3 py-2 rounded-lg border border-line"
                                 >
-                                    <FolderPlusIcon size={16} color="#dc2626" />
-                                    <Text className="text-red-600 ml-1 font-medium">New</Text>
+                                    <FolderPlusIcon size={16} color={colors.danger} />
+                                    <Text className="text-herb-deep ml-1 font-medium">New</Text>
                                 </TouchableOpacity>
                             </View>
 
                             {folders.length === 0 ? (
-                                <View className="bg-white rounded-xl p-6 items-center">
-                                    <FolderIcon size={48} color="#d1d5db" />
-                                    <Text className="text-gray-500 mt-4">No categories yet</Text>
-                                    <Text className="text-gray-400 text-sm mt-1">
+                                <View className="bg-surface rounded-xl p-6 items-center border border-line">
+                                    <FolderIcon size={48} color={colors.line} />
+                                    <Text className="text-muted mt-4">No categories yet</Text>
+                                    <Text className="text-muted text-sm mt-1">
                                         Create a category to organize your recipes
                                     </Text>
                                 </View>
@@ -884,13 +885,13 @@ export default function RecipeManagerScreen() {
                             {/* Search */}
                             <View className="relative mb-4">
                                 <View className="absolute left-3 top-3 z-10">
-                                    <SearchIcon size={18} color="#9ca3af" />
+                                    <SearchIcon size={18} color={colors.muted} />
                                 </View>
                                 <TextInput
                                     placeholder="Search recipes..."
                                     value={searchQuery}
                                     onChangeText={setSearchQuery}
-                                    className="w-full pl-10 pr-4 py-3 bg-white rounded-xl border border-gray-200"
+                                    className="w-full pl-10 pr-4 py-3 bg-surface rounded-xl border border-line text-ink"
                                 />
                             </View>
 
@@ -900,16 +901,16 @@ export default function RecipeManagerScreen() {
                                     setNewRecipe({ ...newRecipe, folder_id: currentFolder.id });
                                     setShowAddRecipe(true);
                                 }}
-                                className="flex-row items-center justify-center bg-white border border-gray-200 py-3 rounded-xl mb-4"
+                                className="flex-row items-center justify-center bg-surface border border-line py-3 rounded-xl mb-4"
                             >
-                                <PlusIcon size={18} color="#374151" />
-                                <Text className="text-gray-700 font-medium ml-2">Add New Recipe</Text>
+                                <PlusIcon size={18} color={colors.ink} />
+                                <Text className="text-ink font-medium ml-2">Add New Recipe</Text>
                             </TouchableOpacity>
 
                             {/* Recipes List */}
                             {filteredRecipes.length === 0 ? (
-                                <View className="bg-white rounded-xl p-6 items-center">
-                                    <Text className="text-gray-500">No recipes found</Text>
+                                <View className="bg-surface rounded-xl p-6 items-center border border-line">
+                                    <Text className="text-muted">No recipes found</Text>
                                     {!searchQuery && (
                                         <AskAiEmptyCta
                                             hint="Skip the forms — just tell the AI what you need."
@@ -935,9 +936,9 @@ export default function RecipeManagerScreen() {
                     )
                 ) : selectedRecipe ? (
                     // Recipe Detail/Edit View
-                    <View className="bg-white rounded-xl overflow-hidden">
-                        <View className="p-4 border-b border-gray-100 bg-gray-50 flex-row justify-between items-center">
-                            <Text className="font-semibold text-gray-800">
+                    <View className="bg-surface rounded-xl overflow-hidden border border-line">
+                        <View className="p-4 border-b border-line bg-linen flex-row justify-between items-center">
+                            <Text className="font-semibold text-ink">
                                 {isEditing ? 'Edit Recipe' : 'Recipe Details'}
                             </Text>
                             <TouchableOpacity
@@ -946,7 +947,7 @@ export default function RecipeManagerScreen() {
                                     setIsEditing(false);
                                 }}
                             >
-                                <XIcon size={20} color="#6b7280" />
+                                <XIcon size={20} color={colors.muted} />
                             </TouchableOpacity>
                         </View>
 
@@ -954,20 +955,20 @@ export default function RecipeManagerScreen() {
                             {isEditing ? (
                                 // Edit Form
                                 <View>
-                                    <Text className="text-gray-700 mb-2">Meal Name</Text>
+                                    <Text className="text-ink mb-2">Meal Name</Text>
                                     <TextInput
                                         value={selectedRecipe.meal_name}
                                         onChangeText={(text) =>
                                             setSelectedRecipe({ ...selectedRecipe, meal_name: text })
                                         }
-                                        className="w-full p-3 border border-gray-200 rounded-xl mb-4 bg-white"
+                                        className="w-full p-3 border border-line rounded-xl mb-4 bg-linen text-ink"
                                     />
 
                                     {renderFolderPicker(selectedRecipe.folder_id, (folderId) =>
                                         setSelectedRecipe({ ...selectedRecipe, folder_id: folderId })
                                     )}
 
-                                    <Text className="text-gray-700 mb-2">Instructions / Steps</Text>
+                                    <Text className="text-ink mb-2">Instructions / Steps</Text>
                                     <TextInput
                                         value={getInstructionsText()}
                                         onChangeText={handleInstructionsChange}
@@ -975,17 +976,17 @@ export default function RecipeManagerScreen() {
                                         multiline
                                         numberOfLines={6}
                                         textAlignVertical="top"
-                                        className="w-full p-3 border border-gray-200 rounded-xl mb-4 bg-white min-h-[120px]"
+                                        className="w-full p-3 border border-line rounded-xl mb-4 bg-linen text-ink min-h-[120px]"
                                     />
 
                                     <View className="flex-row justify-between items-center mb-2">
-                                        <Text className="text-gray-700 font-medium">Ingredients</Text>
+                                        <Text className="text-ink font-medium">Ingredients</Text>
                                         <TouchableOpacity
                                             onPress={handleAddIngredient}
                                             className="flex-row items-center"
                                         >
-                                            <PlusIcon size={16} color="#dc2626" />
-                                            <Text className="text-red-600 ml-1">Add</Text>
+                                            <PlusIcon size={16} color={colors.danger} />
+                                            <Text className="text-herb ml-1">Add</Text>
                                         </TouchableOpacity>
                                     </View>
 
@@ -999,18 +1000,18 @@ export default function RecipeManagerScreen() {
                                                 setSelectedRecipe(null);
                                                 setIsEditing(false);
                                             }}
-                                            className="flex-1 bg-gray-100 py-3 rounded-lg"
+                                            className="flex-1 bg-linen border border-line py-3 rounded-lg"
                                         >
-                                            <Text className="text-gray-700 text-center font-medium">Cancel</Text>
+                                            <Text className="text-ink text-center font-medium">Cancel</Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity
                                             onPress={handleSaveRecipe}
                                             disabled={saving}
-                                            className={`flex-1 py-3 rounded-lg ${saving ? 'bg-gray-300' : 'bg-red-600'
+                                            className={`flex-1 py-3 rounded-lg ${saving ? 'bg-sage' : 'bg-herb'
                                                 }`}
                                         >
                                             {saving ? (
-                                                <ActivityIndicator color="white" />
+                                                <ActivityIndicator color={colors.onHerb} />
                                             ) : (
                                                 <Text className="text-white text-center font-medium">
                                                     Save Changes
@@ -1022,7 +1023,7 @@ export default function RecipeManagerScreen() {
                             ) : (
                                 // View Details
                                 <View>
-                                    <Text className="font-bold text-xl text-gray-800 mb-4">
+                                    <Text className="font-bold text-xl text-ink mb-4">
                                         {selectedRecipe.meal_name}
                                     </Text>
 
@@ -1033,11 +1034,11 @@ export default function RecipeManagerScreen() {
                                         />
                                     ) : null}
 
-                                    <View className="border-t border-b border-gray-100 py-4">
-                                        <Text className="font-medium text-gray-700 mb-2">Ingredients</Text>
+                                    <View className="border-t border-b border-line py-4">
+                                        <Text className="font-medium text-ink mb-2">Ingredients</Text>
                                         {(selectedRecipe.ingredients || []).map((item, index) => (
                                             <View key={index} className="flex-row justify-between py-2">
-                                                <Text className="text-gray-800 capitalize">{item.name}</Text>
+                                                <Text className="text-ink capitalize">{item.name}</Text>
                                                 {Number(item.quantity) > 0 ? (
                                                 <QuantityLabel
                                                     quantity={Number(item.quantity)}
@@ -1046,7 +1047,7 @@ export default function RecipeManagerScreen() {
                                                     baseUnit={item.base_unit}
                                                     defaultDisplayUnit={item.default_display_unit}
                                                     measurementSystem={measurementSystem}
-                                                    style={{ color: '#6b7280' }}
+                                                    style={{ color: colors.muted }}
                                                 />
                                                 ) : null}
                                             </View>
@@ -1054,14 +1055,14 @@ export default function RecipeManagerScreen() {
                                     </View>
 
                                     {(selectedRecipe.instructions?.length ?? 0) > 0 && (
-                                        <View className="border-b border-gray-100 py-4">
-                                            <Text className="font-medium text-gray-700 mb-2">Instructions</Text>
+                                        <View className="border-b border-line py-4">
+                                            <Text className="font-medium text-ink mb-2">Instructions</Text>
                                             {selectedRecipe.instructions.map((step, index) => (
                                                 <View key={index} className="flex-row mb-3">
-                                                    <View className="w-6 h-6 rounded-full bg-gray-100 items-center justify-center mr-3 mt-0.5">
-                                                        <Text className="text-xs font-medium text-gray-700">{index + 1}</Text>
+                                                    <View className="w-6 h-6 rounded-full bg-sage items-center justify-center mr-3 mt-0.5">
+                                                        <Text className="text-xs font-medium text-herb-deep">{index + 1}</Text>
                                                     </View>
-                                                    <Text className="flex-1 text-gray-800 leading-5">{step}</Text>
+                                                    <Text className="flex-1 text-ink leading-5">{step}</Text>
                                                 </View>
                                             ))}
                                         </View>
@@ -1070,10 +1071,10 @@ export default function RecipeManagerScreen() {
                                     <View className="flex-row gap-2 mt-4">
                                         <TouchableOpacity
                                             onPress={() => setIsEditing(true)}
-                                            className="flex-1 bg-blue-50 py-3 rounded-lg flex-row items-center justify-center"
+                                            className="flex-1 bg-sage py-3 rounded-lg flex-row items-center justify-center border border-line"
                                         >
-                                            <EditIcon size={16} color="#3b82f6" />
-                                            <Text className="text-blue-600 font-medium ml-1">Edit Recipe</Text>
+                                            <EditIcon size={16} color={colors.herb} />
+                                            <Text className="text-herb-deep font-medium ml-1">Edit Recipe</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
@@ -1082,22 +1083,22 @@ export default function RecipeManagerScreen() {
                     </View>
                 ) : (
                     // Add New Recipe Form
-                    <View className="bg-white rounded-xl overflow-hidden">
-                        <View className="p-4 border-b border-gray-100 bg-gray-50 flex-row justify-between items-center">
-                            <Text className="font-semibold text-gray-800">Add New Recipe</Text>
+                    <View className="bg-surface rounded-xl overflow-hidden border border-line">
+                        <View className="p-4 border-b border-line bg-linen flex-row justify-between items-center">
+                            <Text className="font-semibold text-ink">Add New Recipe</Text>
                             <TouchableOpacity onPress={() => setShowAddRecipe(false)}>
-                                <XIcon size={20} color="#6b7280" />
+                                <XIcon size={20} color={colors.muted} />
                             </TouchableOpacity>
                         </View>
 
                         <View className="p-4">
                             {/* Meal Name */}
-                            <Text className="text-gray-700 mb-2">Meal Name *</Text>
+                            <Text className="text-ink mb-2">Meal Name *</Text>
                             <TextInput
                                 value={newRecipe.meal_name}
                                 onChangeText={(text) => setNewRecipe({ ...newRecipe, meal_name: text })}
                                 placeholder="Enter meal name"
-                                className="w-full p-3 border border-gray-200 rounded-xl mb-4 bg-white"
+                                className="w-full p-3 border border-line rounded-xl mb-4 bg-linen text-ink"
                             />
 
                             {renderFolderPicker(newRecipe.folder_id, (folderId) =>
@@ -1105,7 +1106,7 @@ export default function RecipeManagerScreen() {
                             )}
 
                             {/* Recipe Image */}
-                            <Text className="text-gray-700 mb-2">Recipe Image</Text>
+                            <Text className="text-ink mb-2">Recipe Image</Text>
                             {newRecipe.image?.url ? (
                                 <View className="relative mb-4">
                                     <Image
@@ -1117,34 +1118,34 @@ export default function RecipeManagerScreen() {
                                         onPress={removeImage}
                                         className="absolute top-2 right-2 bg-black/50 p-2 rounded-full"
                                     >
-                                        <XIcon size={16} color="white" />
+                                        <XIcon size={16} color={colors.onHerb} />
                                     </TouchableOpacity>
                                 </View>
                             ) : (
                                 <View className="flex-row gap-3 mb-4">
                                     <TouchableOpacity
                                         onPress={takePhoto}
-                                        className="flex-1 flex-row items-center justify-center py-3 bg-gray-100 rounded-xl border border-dashed border-gray-300"
+                                        className="flex-1 flex-row items-center justify-center py-3 bg-linen rounded-xl border border-dashed border-line"
                                     >
-                                        <CameraIcon size={20} color="#6b7280" />
-                                        <Text className="text-gray-600 ml-2">Camera</Text>
+                                        <CameraIcon size={20} color={colors.muted} />
+                                        <Text className="text-muted ml-2">Camera</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity
                                         onPress={pickImage}
-                                        className="flex-1 flex-row items-center justify-center py-3 bg-gray-100 rounded-xl border border-dashed border-gray-300"
+                                        className="flex-1 flex-row items-center justify-center py-3 bg-linen rounded-xl border border-dashed border-line"
                                     >
-                                        <ImageIcon size={20} color="#6b7280" />
-                                        <Text className="text-gray-600 ml-2">Gallery</Text>
+                                        <ImageIcon size={20} color={colors.muted} />
+                                        <Text className="text-muted ml-2">Gallery</Text>
                                     </TouchableOpacity>
                                 </View>
                             )}
 
                             {/* Ingredients */}
                             <View className="flex-row justify-between items-center mb-2">
-                                <Text className="text-gray-700 font-medium">Ingredients *</Text>
+                                <Text className="text-ink font-medium">Ingredients *</Text>
                                 <TouchableOpacity onPress={handleAddIngredient} className="flex-row items-center">
-                                    <PlusIcon size={16} color="#dc2626" />
-                                    <Text className="text-red-600 ml-1">Add</Text>
+                                    <PlusIcon size={16} color={colors.danger} />
+                                    <Text className="text-herb ml-1">Add</Text>
                                 </TouchableOpacity>
                             </View>
 
@@ -1153,7 +1154,7 @@ export default function RecipeManagerScreen() {
                             ))}
 
                             {/* Instructions */}
-                            <Text className="text-gray-700 mb-2 mt-4">Instructions / Steps</Text>
+                            <Text className="text-ink mb-2 mt-4">Instructions / Steps</Text>
                             <TextInput
                                 value={getInstructionsText()}
                                 onChangeText={handleInstructionsChange}
@@ -1161,7 +1162,7 @@ export default function RecipeManagerScreen() {
                                 multiline
                                 numberOfLines={6}
                                 textAlignVertical="top"
-                                className="w-full p-3 border border-gray-200 rounded-xl mb-4 bg-white min-h-[120px]"
+                                className="w-full p-3 border border-line rounded-xl mb-4 bg-linen text-ink min-h-[120px]"
                             />
 
                             {/* Save Button */}
@@ -1173,17 +1174,17 @@ export default function RecipeManagerScreen() {
                                     saving
                                 }
                                 className={`w-full py-3 rounded-xl mt-2 ${newRecipe.meal_name?.trim() && (newRecipe.ingredients || []).length > 0 && !saving
-                                    ? 'bg-red-600'
-                                    : 'bg-gray-200'
+                                    ? 'bg-herb'
+                                    : 'bg-sage'
                                     }`}
                             >
                                 {saving ? (
-                                    <ActivityIndicator color="white" />
+                                    <ActivityIndicator color={colors.onHerb} />
                                 ) : (
                                     <Text
                                         className={`text-center font-medium ${newRecipe.meal_name?.trim() && (newRecipe.ingredients || []).length > 0
                                             ? 'text-white'
-                                            : 'text-gray-400'
+                                            : 'text-muted'
                                             }`}
                                     >
                                         Save Recipe
@@ -1198,39 +1199,39 @@ export default function RecipeManagerScreen() {
             {/* Add Folder Modal */}
             <Modal visible={showAddFolder} transparent animationType="fade">
                 <View className="flex-1 bg-black/50 items-center justify-center p-4">
-                    <View className="bg-white rounded-xl w-full max-w-sm">
-                        <View className="p-4 border-b border-gray-100 flex-row justify-between items-center">
-                            <Text className="font-medium text-gray-800">Create New Category</Text>
+                    <View className="bg-surface rounded-xl w-full max-w-sm border border-line">
+                        <View className="p-4 border-b border-line flex-row justify-between items-center">
+                            <Text className="font-medium text-ink">Create New Category</Text>
                             <TouchableOpacity onPress={() => setShowAddFolder(false)}>
-                                <XIcon size={20} color="#6b7280" />
+                                <XIcon size={20} color={colors.muted} />
                             </TouchableOpacity>
                         </View>
                         <View className="p-6">
-                            <Text className="text-gray-700 mb-2">Category Name</Text>
+                            <Text className="text-ink mb-2">Category Name</Text>
                             <TextInput
                                 value={newFolderName}
                                 onChangeText={setNewFolderName}
                                 placeholder="Enter category name"
-                                className="w-full p-3 border border-gray-200 rounded-xl mb-4 bg-white"
+                                className="w-full p-3 border border-line rounded-xl mb-4 bg-linen text-ink"
                             />
                             <View className="flex-row gap-2">
                                 <TouchableOpacity
                                     onPress={() => setShowAddFolder(false)}
-                                    className="flex-1 bg-gray-100 py-3 rounded-lg"
+                                    className="flex-1 bg-linen border border-line py-3 rounded-lg"
                                 >
-                                    <Text className="text-gray-700 text-center">Cancel</Text>
+                                    <Text className="text-ink text-center">Cancel</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     onPress={handleCreateFolder}
                                     disabled={!newFolderName.trim() || saving}
-                                    className={`flex-1 py-3 rounded-lg ${newFolderName.trim() && !saving ? 'bg-red-600' : 'bg-gray-200'
+                                    className={`flex-1 py-3 rounded-lg ${newFolderName.trim() && !saving ? 'bg-herb' : 'bg-sage'
                                         }`}
                                 >
                                     {saving ? (
-                                        <ActivityIndicator color="white" />
+                                        <ActivityIndicator color={colors.onHerb} />
                                     ) : (
                                         <Text
-                                            className={`text-center ${newFolderName.trim() ? 'text-white' : 'text-gray-400'
+                                            className={`text-center ${newFolderName.trim() ? 'text-white' : 'text-muted'
                                                 }`}
                                         >
                                             Create
@@ -1246,39 +1247,39 @@ export default function RecipeManagerScreen() {
             {/* Edit Folder Modal */}
             <Modal visible={!!editingFolder} transparent animationType="fade">
                 <View className="flex-1 bg-black/50 items-center justify-center p-4">
-                    <View className="bg-white rounded-xl w-full max-w-sm">
-                        <View className="p-4 border-b border-gray-100 flex-row justify-between items-center">
-                            <Text className="font-medium text-gray-800">Rename Category</Text>
+                    <View className="bg-surface rounded-xl w-full max-w-sm border border-line">
+                        <View className="p-4 border-b border-line flex-row justify-between items-center">
+                            <Text className="font-medium text-ink">Rename Category</Text>
                             <TouchableOpacity onPress={() => setEditingFolder(null)}>
-                                <XIcon size={20} color="#6b7280" />
+                                <XIcon size={20} color={colors.muted} />
                             </TouchableOpacity>
                         </View>
                         <View className="p-6">
-                            <Text className="text-gray-700 mb-2">Category Name</Text>
+                            <Text className="text-ink mb-2">Category Name</Text>
                             <TextInput
                                 value={newFolderName}
                                 onChangeText={setNewFolderName}
                                 placeholder="Enter category name"
-                                className="w-full p-3 border border-gray-200 rounded-xl mb-4 bg-white"
+                                className="w-full p-3 border border-line rounded-xl mb-4 bg-linen text-ink"
                             />
                             <View className="flex-row gap-2">
                                 <TouchableOpacity
                                     onPress={() => setEditingFolder(null)}
-                                    className="flex-1 bg-gray-100 py-3 rounded-lg"
+                                    className="flex-1 bg-linen border border-line py-3 rounded-lg"
                                 >
-                                    <Text className="text-gray-700 text-center">Cancel</Text>
+                                    <Text className="text-ink text-center">Cancel</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     onPress={handleUpdateFolder}
                                     disabled={!newFolderName.trim() || saving}
-                                    className={`flex-1 py-3 rounded-lg ${newFolderName.trim() && !saving ? 'bg-red-600' : 'bg-gray-200'
+                                    className={`flex-1 py-3 rounded-lg ${newFolderName.trim() && !saving ? 'bg-herb' : 'bg-sage'
                                         }`}
                                 >
                                     {saving ? (
-                                        <ActivityIndicator color="white" />
+                                        <ActivityIndicator color={colors.onHerb} />
                                     ) : (
                                         <Text
-                                            className={`text-center ${newFolderName.trim() ? 'text-white' : 'text-gray-400'
+                                            className={`text-center ${newFolderName.trim() ? 'text-white' : 'text-muted'
                                                 }`}
                                         >
                                             Update
@@ -1294,32 +1295,32 @@ export default function RecipeManagerScreen() {
             {/* Delete Folder Confirmation Modal */}
             <Modal visible={showDeleteConfirm} transparent animationType="fade">
                 <View className="flex-1 bg-black/50 items-center justify-center p-4">
-                    <View className="bg-white rounded-xl w-full max-w-sm">
+                    <View className="bg-surface rounded-xl w-full max-w-sm border border-line">
                         <View className="p-6">
                             <View className="flex-row items-center mb-4">
-                                <AlertCircleIcon size={24} color="#dc2626" />
-                                <Text className="text-lg font-medium text-red-600 ml-2">Delete Category</Text>
+                                <AlertCircleIcon size={24} color={colors.danger} />
+                                <Text className="text-lg font-medium ml-2" style={{ color: colors.danger }}>Delete Category</Text>
                             </View>
-                            <Text className="text-gray-600 mb-2">
+                            <Text className="text-muted mb-2">
                                 Are you sure you want to delete "{folderToDelete?.name}"?
                             </Text>
-                            <Text className="text-gray-500 text-sm mb-6">
+                            <Text className="text-muted text-sm mb-6">
                                 All recipes in this category will be moved to "Uncategorized".
                             </Text>
                             <View className="flex-row justify-end gap-3">
                                 <TouchableOpacity
                                     onPress={() => setShowDeleteConfirm(false)}
-                                    className="px-4 py-2 bg-gray-100 rounded-lg"
+                                    className="px-4 py-2 bg-linen border border-line rounded-lg"
                                 >
-                                    <Text className="text-gray-700">Cancel</Text>
+                                    <Text className="text-ink">Cancel</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     onPress={handleDeleteFolder}
                                     disabled={saving}
-                                    className="px-4 py-2 bg-red-600 rounded-lg"
+                                    className="px-4 py-2 bg-herb-deep rounded-lg"
                                 >
                                     {saving ? (
-                                        <ActivityIndicator color="white" size="small" />
+                                        <ActivityIndicator color={colors.onHerb} size="small" />
                                     ) : (
                                         <Text className="text-white">Delete</Text>
                                     )}

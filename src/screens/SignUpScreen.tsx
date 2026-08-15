@@ -1,196 +1,163 @@
 ﻿import React, { useState } from 'react';
-import {
-    View,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    ActivityIndicator,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-} from 'react-native';
+import { View, Text, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ChefHat } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contexts/authContext';
 import { User } from '../types';
+import { PrimaryButton, TextField } from '../components/ui';
+import { colors } from '../theme/tokens';
 
 export default function SignUpScreen() {
-    const navigation = useNavigation();
-    const { signUp, loading } = useAuth();
+  const navigation = useNavigation();
+  const { signUp, submitting } = useAuth();
 
-    const [firstName, setFirstName] = useState('');
-    const [lastName, setLastName] = useState('');
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-    const [error, setError] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
 
-    const handleSubmit = async () => {
-        if (!firstName || !lastName || !email || !password) {
-            setError('Please fill all fields');
-            return;
-        }
+  const handleSubmit = async () => {
+    if (!firstName || !lastName || !email || !password) {
+      setError('Please fill all fields');
+      return;
+    }
 
-        if (password !== confirmPassword) {
-            setError('Passwords do not match');
-            return;
-        }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
 
-        if (password.length < 6) {
-            setError('Password must be at least 6 characters');
-            return;
-        }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
 
-        setError('');
+    setError('');
 
-        try {
-            const user: User = {
-                first_name: firstName,
-                last_name: lastName,
-                email,
-                name: `${firstName} ${lastName}`,
-            };
+    try {
+      const user: User = {
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        name: `${firstName} ${lastName}`,
+      };
 
-            const response = await signUp(user, password);
+      const response = await signUp(user, password);
 
-            if (response.success) {
-                navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'Main' as never }],
-                });
-            } else {
-                setError(response.message || 'Sign up failed');
-            }
-        } catch {
-            setError('An error occurred. Please try again.');
-        }
-    };
+      if (!response.success) {
+        setError(response.message || 'Sign up failed');
+      }
+    } catch {
+      setError('An error occurred. Please try again.');
+    }
+  };
 
-    return (
-        <SafeAreaView className="flex-1 bg-gray-50">
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                className="flex-1"
-            >
-                <ScrollView
-                    className="flex-1"
-                    contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
-                    keyboardShouldPersistTaps="handled"
-                >
-                    <View className="px-6 py-8">
-                        <View className="w-full max-w-md mx-auto">
-                            <View className="items-center mb-8">
-                                <Text className="text-4xl font-bold text-orange-600">LarderMind</Text>
-                                <Text className="mt-2 text-base text-gray-600">Create your account with email</Text>
-                            </View>
+  return (
+    <SafeAreaView className="flex-1 bg-linen">
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        className="flex-1"
+      >
+        <ScrollView
+          className="flex-1"
+          contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View className="px-6 py-8">
+            <View className="w-full max-w-md mx-auto">
+              <View className="items-center mb-10">
+                <View className="w-12 h-12 rounded-lg bg-herb items-center justify-center mb-4">
+                  <ChefHat size={24} color={colors.onHerb} />
+                </View>
+                <Text className="font-display text-4xl font-semibold text-ink">LarderMind</Text>
+                <Text className="mt-2 text-base text-muted">Create your account with email</Text>
+              </View>
 
-                            <View className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8">
-                                {loading ? (
-                                    <View className="py-10 items-center">
-                                        <ActivityIndicator size="large" color="#f97316" />
-                                    </View>
-                                ) : (
-                                    <>
-                                        {error ? (
-                                            <View className="bg-red-50 px-4 py-3 rounded-lg mb-4">
-                                                <Text className="text-red-600 text-sm text-center">{error}</Text>
-                                            </View>
-                                        ) : null}
+              {error ? (
+                <View className="bg-sage/60 border border-line px-4 py-3 rounded-lg mb-4">
+                  <Text className="text-herb-deep text-sm text-center">{error}</Text>
+                </View>
+              ) : null}
 
-                                        <View className="flex-row gap-3 mb-4">
-                                            <View className="flex-1">
-                                                <Text className="text-sm font-medium text-gray-700 mb-1">First Name</Text>
-                                                <TextInput
-                                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50"
-                                                    placeholder="John"
-                                                    placeholderTextColor="#9ca3af"
-                                                    value={firstName}
-                                                    onChangeText={setFirstName}
-                                                    autoCapitalize="words"
-                                                />
-                                            </View>
-                                            <View className="flex-1">
-                                                <Text className="text-sm font-medium text-gray-700 mb-1">Last Name</Text>
-                                                <TextInput
-                                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50"
-                                                    placeholder="Doe"
-                                                    placeholderTextColor="#9ca3af"
-                                                    value={lastName}
-                                                    onChangeText={setLastName}
-                                                    autoCapitalize="words"
-                                                />
-                                            </View>
-                                        </View>
+              <View className="flex-row gap-3 mb-4">
+                <TextField
+                  label="First Name"
+                  containerClassName="flex-1"
+                  placeholder="John"
+                  value={firstName}
+                  onChangeText={setFirstName}
+                  autoCapitalize="words"
+                  editable={!submitting}
+                />
+                <TextField
+                  label="Last Name"
+                  containerClassName="flex-1"
+                  placeholder="Doe"
+                  value={lastName}
+                  onChangeText={setLastName}
+                  autoCapitalize="words"
+                  editable={!submitting}
+                />
+              </View>
 
-                                        <View className="mb-4">
-                                            <Text className="text-sm font-medium text-gray-700 mb-1">Email</Text>
-                                            <TextInput
-                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50"
-                                                placeholder="you@example.com"
-                                                placeholderTextColor="#9ca3af"
-                                                value={email}
-                                                onChangeText={setEmail}
-                                                keyboardType="email-address"
-                                                autoCapitalize="none"
-                                                autoCorrect={false}
-                                                autoComplete="email"
-                                            />
-                                        </View>
+              <TextField
+                label="Email"
+                containerClassName="mb-4"
+                placeholder="you@example.com"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                editable={!submitting}
+              />
 
-                                        <View className="mb-4">
-                                            <Text className="text-sm font-medium text-gray-700 mb-1">Password</Text>
-                                            <TextInput
-                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50"
-                                                placeholder="••••••••"
-                                                placeholderTextColor="#9ca3af"
-                                                value={password}
-                                                onChangeText={setPassword}
-                                                secureTextEntry
-                                                autoComplete="new-password"
-                                            />
-                                        </View>
+              <TextField
+                label="Password"
+                containerClassName="mb-4"
+                placeholder="••••••••"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                autoComplete="new-password"
+                editable={!submitting}
+              />
 
-                                        <View className="mb-6">
-                                            <Text className="text-sm font-medium text-gray-700 mb-1">Confirm Password</Text>
-                                            <TextInput
-                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50"
-                                                placeholder="••••••••"
-                                                placeholderTextColor="#9ca3af"
-                                                value={confirmPassword}
-                                                onChangeText={setConfirmPassword}
-                                                secureTextEntry
-                                                autoComplete="new-password"
-                                            />
-                                        </View>
+              <TextField
+                label="Confirm Password"
+                containerClassName="mb-6"
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry
+                autoComplete="new-password"
+                editable={!submitting}
+              />
 
-                                        <TouchableOpacity
-                                            onPress={handleSubmit}
-                                            className="w-full py-4 rounded-lg bg-orange-500 mb-6"
-                                            activeOpacity={0.8}
-                                        >
-                                            <Text className="text-white text-center font-semibold text-lg">
-                                                Sign up
-                                            </Text>
-                                        </TouchableOpacity>
+              <PrimaryButton
+                label="Sign up"
+                onPress={handleSubmit}
+                loading={submitting}
+                disabled={submitting}
+                className="mb-6"
+              />
 
-                                        <View className="items-center">
-                                            <Text className="text-sm text-gray-600">
-                                                Already have an account?{' '}
-                                                <Text
-                                                    onPress={() => navigation.goBack()}
-                                                    className="text-orange-600 font-medium"
-                                                >
-                                                    Log in
-                                                </Text>
-                                            </Text>
-                                        </View>
-                                    </>
-                                )}
-                            </View>
-                        </View>
-                    </View>
-                </ScrollView>
-            </KeyboardAvoidingView>
-        </SafeAreaView>
-    );
+              <View className="items-center">
+                <Text className="text-sm text-muted">
+                  Already have an account?{' '}
+                  <Text onPress={() => navigation.goBack()} className="text-herb font-medium">
+                    Log in
+                  </Text>
+                </Text>
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
 }

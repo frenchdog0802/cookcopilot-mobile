@@ -25,6 +25,7 @@ import AppHeader from '../components/AppHeader';
 import ChatMessageContent from '../components/ChatMessageContent';
 import { chatApi, ChatResponseData, ChatResponseType, HistoryMessage } from '../api/chat';
 import { mealPlanApi } from '../api/mealPlan';
+import { colors } from '../theme/tokens';
 
 /** Matches ChatGPT / Claude-style mobile composers: comfortable single line, grows with content. */
 const INPUT_MIN_HEIGHT = 44;
@@ -286,31 +287,31 @@ export default function AICookingAssistantScreen() {
         return (
             <View className={`mb-4 ${isUser ? 'items-end' : 'items-start'}`}>
                 <View
-                    className={`max-w-[85%] rounded-2xl px-4 py-3 ${isUser ? 'bg-orange-500' : item.type === 'error' ? 'bg-red-50 border border-red-200' : 'bg-white border border-gray-200'
+                    className={`max-w-[85%] rounded-2xl px-4 py-3 ${isUser ? 'bg-herb' : item.type === 'error' ? 'bg-sage border border-line' : 'bg-surface border border-line'
                         }`}
                 >
                     <ChatMessageContent
                         content={item.content}
                         isUser={isUser}
-                        style={item.type === 'error' && !isUser ? { color: '#b91c1c' } : undefined}
+                        style={item.type === 'error' && !isUser ? { color: colors.danger } : undefined}
                     />
 
                     {(item.type === 'recipe_created' || item.type === 'recipe_imported') && item.cardData && (
-                        <View className="mt-3 bg-gray-50 rounded-xl p-4 border border-gray-100">
-                            <Text className="font-bold text-lg text-gray-800 mb-1">
+                        <View className="mt-3 bg-linen rounded-xl p-4 border border-line">
+                            <Text className="font-bold text-lg text-ink mb-1">
                                 {item.type === 'recipe_imported' ? 'Imported' : 'Recipe'}: {item.cardData.recipeName}
                             </Text>
-                            <Text className="text-sm text-gray-500 mb-3">
+                            <Text className="text-sm text-muted mb-3">
                                 {item.cardData.ingredientCount ?? 0} ingredients · {(item.cardData.steps ?? []).length} steps
                             </Text>
                             {(item.cardData.steps ?? []).length > 0 && (
                                 <View className="mb-3">
                                     {(item.cardData.steps ?? []).map((step, index) => (
                                         <View key={index} className="flex-row mb-2">
-                                            <View className="w-5 h-5 rounded-full bg-orange-100 items-center justify-center mr-2 mt-0.5">
-                                                <Text className="text-xs font-medium text-orange-700">{index + 1}</Text>
+                                            <View className="w-5 h-5 rounded-full bg-sage items-center justify-center mr-2 mt-0.5">
+                                                <Text className="text-xs font-medium text-herb-deep">{index + 1}</Text>
                                             </View>
-                                            <Text className="flex-1 text-sm text-gray-700 leading-5">{step}</Text>
+                                            <Text className="flex-1 text-sm text-ink leading-5">{step}</Text>
                                         </View>
                                     ))}
                                 </View>
@@ -318,48 +319,48 @@ export default function AICookingAssistantScreen() {
                             <View className="flex-row gap-2">
                                 <TouchableOpacity
                                     onPress={() => item.cardData?.recipeId && handleViewCreatedRecipe(item.cardData.recipeId)}
-                                    className="flex-1 bg-blue-50 py-2 rounded-lg items-center"
+                                    className="flex-1 bg-sage py-2 rounded-lg items-center border border-line"
                                 >
-                                    <Text className="text-blue-600 text-sm">Edit Recipe</Text>
+                                    <Text className="text-herb-deep text-sm">Edit Recipe</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     onPress={() => item.cardData?.recipeId && handleAddCreatedRecipeToMenu(item.cardData.recipeId)}
                                     disabled={addingToMenuRecipeId === item.cardData.recipeId}
-                                    className="flex-1 bg-green-50 py-2 rounded-lg items-center"
+                                    className="flex-1 bg-sage py-2 rounded-lg items-center border border-line"
                                 >
-                                    <Text className="text-green-600 text-sm">Add to today's dinner</Text>
+                                    <Text className="text-herb-deep text-sm">Add to today's dinner</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
                     )}
 
                     {item.type === 'recipe_updated' && item.cardData && (
-                        <View className="mt-3 bg-gray-50 rounded-xl p-4 border border-gray-100">
-                            <Text className="font-medium text-gray-800">Updated: {item.cardData.recipeName}</Text>
+                        <View className="mt-3 bg-linen rounded-xl p-4 border border-line">
+                            <Text className="font-medium text-ink">Updated: {item.cardData.recipeName}</Text>
                             <TouchableOpacity
                                 onPress={() => item.cardData?.recipeId && handleViewCreatedRecipe(item.cardData.recipeId)}
-                                className="mt-3 bg-blue-50 py-2 rounded-lg items-center"
+                                className="mt-3 bg-sage py-2 rounded-lg items-center border border-line"
                             >
-                                <Text className="text-blue-600 text-sm">Edit Recipe</Text>
+                                <Text className="text-herb-deep text-sm">Edit Recipe</Text>
                             </TouchableOpacity>
                         </View>
                     )}
 
                     {item.type === 'shopping_list_updated' && item.cardData && (
-                        <View className="mt-3 bg-gray-50 rounded-xl p-4 border border-gray-100">
-                            <Text className="font-medium text-gray-800 mb-2">
+                        <View className="mt-3 bg-linen rounded-xl p-4 border border-line">
+                            <Text className="font-medium text-ink mb-2">
                                 Added {item.cardData.itemsAdded ?? 0} items to your shopping list
                             </Text>
                             <View className="flex-row flex-wrap gap-2 mb-3">
                                 {(item.cardData.items ?? []).map((shoppingItem, index) => (
-                                    <View key={`${shoppingItem.name}-${index}`} className="bg-orange-50 px-2 py-1 rounded-full">
-                                        <Text className="text-orange-700 text-xs">{shoppingItem.name}</Text>
+                                    <View key={`${shoppingItem.name}-${index}`} className="bg-sage px-2 py-1 rounded-full">
+                                        <Text className="text-herb-deep text-xs">{shoppingItem.name}</Text>
                                     </View>
                                 ))}
                             </View>
                             <TouchableOpacity
                                 onPress={handleViewShoppingList}
-                                className="bg-orange-500 py-2 rounded-lg items-center"
+                                className="bg-herb py-2 rounded-lg items-center"
                             >
                                 <Text className="text-white text-sm">View Shopping List</Text>
                             </TouchableOpacity>
@@ -367,55 +368,55 @@ export default function AICookingAssistantScreen() {
                     )}
 
                     {item.type === 'meal_plan_updated' && item.cardData && (
-                        <View className="mt-3 bg-gray-50 rounded-xl p-4 border border-gray-100">
-                            <Text className="font-medium text-gray-800 mb-2">
+                        <View className="mt-3 bg-linen rounded-xl p-4 border border-line">
+                            <Text className="font-medium text-ink mb-2">
                                 {item.cardData.mealsScheduled
                                     ? `Scheduled ${item.cardData.mealsScheduled} meal(s)`
                                     : `${item.cardData.recipeName} — ${item.cardData.mealType} on ${item.cardData.servingDate}`}
                             </Text>
-                            <TouchableOpacity onPress={handleViewCalendar} className="bg-orange-500 py-2 rounded-lg items-center">
+                            <TouchableOpacity onPress={handleViewCalendar} className="bg-herb py-2 rounded-lg items-center">
                                 <Text className="text-white text-sm">Open Calendar</Text>
                             </TouchableOpacity>
                         </View>
                     )}
 
                     {item.type === 'pantry_updated' && item.cardData && (
-                        <View className="mt-3 bg-gray-50 rounded-xl p-4 border border-gray-100">
-                            <Text className="font-medium text-gray-800 mb-2">
+                        <View className="mt-3 bg-linen rounded-xl p-4 border border-line">
+                            <Text className="font-medium text-ink mb-2">
                                 {item.cardData.removedDuplicates != null
                                     ? `Pantry organized — merged ${item.cardData.mergedGroups ?? 0} group(s)`
                                     : `Added ${item.cardData.itemsAdded ?? 0} item(s) to pantry`}
                             </Text>
-                            <TouchableOpacity onPress={handleViewPantry} className="bg-orange-500 py-2 rounded-lg items-center">
+                            <TouchableOpacity onPress={handleViewPantry} className="bg-herb py-2 rounded-lg items-center">
                                 <Text className="text-white text-sm">Open Pantry</Text>
                             </TouchableOpacity>
                         </View>
                     )}
 
                     {item.type === 'meal_suggestions' && item.cardData && (
-                        <View className="mt-3 bg-gray-50 rounded-xl p-4 border border-gray-100">
-                            <Text className="font-medium text-gray-800 mb-2">Meal suggestions</Text>
+                        <View className="mt-3 bg-linen rounded-xl p-4 border border-line">
+                            <Text className="font-medium text-ink mb-2">Meal suggestions</Text>
                             {(item.cardData.suggestions ?? []).map((s, index) => (
-                                <Text key={index} className="text-sm text-gray-600">
+                                <Text key={index} className="text-sm text-muted">
                                     {s.recipeName} — {s.matchScore}% match
                                 </Text>
                             ))}
-                            <TouchableOpacity onPress={handleViewCalendar} className="mt-3 bg-blue-50 py-2 rounded-lg items-center">
-                                <Text className="text-blue-600 text-sm">View Calendar</Text>
+                            <TouchableOpacity onPress={handleViewCalendar} className="mt-3 bg-sage py-2 rounded-lg items-center border border-line">
+                                <Text className="text-herb-deep text-sm">View Calendar</Text>
                             </TouchableOpacity>
                         </View>
                     )}
 
                     {item.type === 'multi_action' && item.cardData && (
-                        <View className="mt-3 bg-gray-50 rounded-xl p-4 border border-gray-100">
-                            <Text className="font-medium text-gray-800">
+                        <View className="mt-3 bg-linen rounded-xl p-4 border border-line">
+                            <Text className="font-medium text-ink">
                                 Completed {item.cardData.actionCount ?? 0} action(s)
                             </Text>
                         </View>
                     )}
                 </View>
 
-                <Text className="text-xs text-gray-400 mt-1 mx-2">
+                <Text className="text-xs text-muted mt-1 mx-2">
                     {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </Text>
             </View>
@@ -423,11 +424,11 @@ export default function AICookingAssistantScreen() {
     };
 
     return (
-        <View className="flex-1 bg-gray-50">
+        <View className="flex-1 bg-linen">
             <AppHeader
                 title="AI Cooking Assistant"
                 showBackButton
-                rightElement={<RefreshCwIcon size={20} color="white" />}
+                rightElement={<RefreshCwIcon size={20} color={colors.ink} />}
                 onRightPress={handleClearChat}
             />
 
@@ -448,15 +449,15 @@ export default function AICookingAssistantScreen() {
 
                 {isTyping && (
                     <View className="px-4 pb-2">
-                        <View className="bg-white rounded-2xl px-4 py-3 self-start border border-gray-200 flex-row items-center gap-2">
-                            <ActivityIndicator size="small" color="#f97316" />
-                            <Text className="text-gray-500">Thinking...</Text>
+                        <View className="bg-surface rounded-2xl px-4 py-3 self-start border border-line flex-row items-center gap-2">
+                            <ActivityIndicator size="small" color={colors.herb} />
+                            <Text className="text-muted">Thinking...</Text>
                         </View>
                     </View>
                 )}
 
                 <View
-                    className="bg-white border-t border-gray-100 px-3 pt-3"
+                    className="bg-surface border-t border-line px-3 pt-3"
                     style={{ paddingBottom: Math.max(insets.bottom, 12) }}
                 >
                     <ScrollView
@@ -470,18 +471,18 @@ export default function AICookingAssistantScreen() {
                             <TouchableOpacity
                                 key={prompt}
                                 onPress={() => setInput(prompt)}
-                                className="bg-orange-50 px-3.5 py-2 rounded-full mr-2 border border-orange-100"
+                                className="bg-sage px-3.5 py-2 rounded-full mr-2 border border-line"
                             >
-                                <Text className="text-orange-700 text-sm">{prompt}</Text>
+                                <Text className="text-herb-deep text-sm">{prompt}</Text>
                             </TouchableOpacity>
                         ))}
                     </ScrollView>
 
                     {/* ChatGPT / Claude-style pill composer */}
                     <View className="flex-row items-end gap-2.5">
-                        <View className="flex-1 flex-row items-end rounded-[28px] border border-gray-200 bg-gray-50 pl-4 pr-2 py-2 min-h-[56px]">
+                        <View className="flex-1 flex-row items-end rounded-[28px] border border-line bg-linen pl-4 pr-2 py-2 min-h-[56px]">
                             <TextInput
-                                className="flex-1 text-gray-900"
+                                className="flex-1 text-ink"
                                 style={{
                                     fontSize: 16,
                                     lineHeight: 22,
@@ -492,7 +493,7 @@ export default function AICookingAssistantScreen() {
                                     marginRight: 8,
                                 }}
                                 placeholder="Message LarderMind…"
-                                placeholderTextColor="#9ca3af"
+                                placeholderTextColor={colors.muted}
                                 value={input}
                                 onChangeText={setInput}
                                 onContentSizeChange={handleInputContentSizeChange}
@@ -508,10 +509,10 @@ export default function AICookingAssistantScreen() {
                                 accessibilityRole="button"
                                 accessibilityLabel="Send message"
                                 className={`w-11 h-11 rounded-full items-center justify-center mb-0.5 ${
-                                    canSend ? 'bg-orange-500' : 'bg-gray-200'
+                                    canSend ? 'bg-herb' : 'bg-sage'
                                 }`}
                             >
-                                <SendIcon size={20} color={canSend ? 'white' : '#9ca3af'} />
+                                <SendIcon size={20} color={canSend ? colors.onHerb : colors.muted} />
                             </TouchableOpacity>
                         </View>
                     </View>

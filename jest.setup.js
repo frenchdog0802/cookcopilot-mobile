@@ -30,3 +30,25 @@ jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }))
 jest.mock('expo-status-bar', () => ({ StatusBar: () => null }));
 jest.mock('expo-image', () => ({ Image: () => null }));
 jest.mock('nativewind', () => ({ styled: (c) => c, useColorScheme: () => 'light' }));
+
+jest.mock('expo-font', () => ({
+    useFonts: () => [true, null],
+    loadAsync: jest.fn(() => Promise.resolve()),
+}));
+
+jest.mock('@expo-google-fonts/fraunces', () => ({
+    useFonts: () => [true, null],
+    Fraunces_400Regular: 'Fraunces_400Regular',
+    Fraunces_500Medium: 'Fraunces_500Medium',
+    Fraunces_600SemiBold: 'Fraunces_600SemiBold',
+    Fraunces_700Bold: 'Fraunces_700Bold',
+}));
+
+jest.mock('@expo-google-fonts/source-sans-3', () => ({
+    useFonts: () => [true, null],
+    SourceSans3_300Light: 'SourceSans3_300Light',
+    SourceSans3_400Regular: 'SourceSans3_400Regular',
+    SourceSans3_500Medium: 'SourceSans3_500Medium',
+    SourceSans3_600SemiBold: 'SourceSans3_600SemiBold',
+    SourceSans3_700Bold: 'SourceSans3_700Bold',
+}));

@@ -32,6 +32,7 @@ import { recipeApi } from '../api/recipe';
 import { useNavigation } from '@react-navigation/native';
 import AppHeader from '../components/AppHeader';
 import AskAiEmptyCta from '../components/AskAiEmptyCta';
+import { colors } from '../theme/tokens';
 
 const { width } = Dimensions.get('window');
 
@@ -221,12 +222,12 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
     // Render
     // ──────────────────────────────────────────────────────────────
     return (
-        <View className="flex-1 bg-gray-50">
+        <View className="flex-1 bg-linen">
             <AppHeader
                 title="Cooking Calendar"
                 showBackButton
                 onBack={handleBack}
-                rightElement={<Plus size={24} color="white" />}
+                rightElement={<Plus size={24} color={colors.ink} />}
                 onRightPress={() => {
                     setSelectedDate(new Date());
                     setShowAddModal(true);
@@ -234,14 +235,14 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
             />
 
             {/* View Mode Toggle */}
-            <View className="px-4 py-3 bg-white border-b border-gray-200">
-                <View className="flex-row bg-gray-100 rounded-xl p-1.5">
+            <View className="px-4 py-3 bg-linen border-b border-line">
+                <View className="flex-row bg-surface rounded-xl p-1.5 border border-line">
                     <TouchableOpacity
                         onPress={() => setViewMode('calendar')}
-                        className={`flex-1 py-2.5 rounded-lg ${viewMode === 'calendar' ? 'bg-red-500' : ''}`}
+                        className={`flex-1 py-2.5 rounded-lg ${viewMode === 'calendar' ? 'bg-herb' : ''}`}
                     >
                         <Text
-                            className={`text-center font-medium ${viewMode === 'calendar' ? 'text-white' : 'text-gray-600'
+                            className={`text-center font-medium ${viewMode === 'calendar' ? 'text-white' : 'text-muted'
                                 }`}
                         >
                             Month
@@ -250,10 +251,10 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
 
                     <TouchableOpacity
                         onPress={() => setViewMode('list')}
-                        className={`flex-1 py-2.5 rounded-lg ${viewMode === 'list' ? 'bg-red-500' : ''}`}
+                        className={`flex-1 py-2.5 rounded-lg ${viewMode === 'list' ? 'bg-herb' : ''}`}
                     >
                         <Text
-                            className={`text-center font-medium ${viewMode === 'list' ? 'text-white' : 'text-gray-600'
+                            className={`text-center font-medium ${viewMode === 'list' ? 'text-white' : 'text-muted'
                                 }`}
                         >
                             Week
@@ -264,8 +265,8 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
 
             <ScrollView className="flex-1 px-4 pt-3">
                 {mealPlans.length === 0 && (
-                    <View className="mb-4 bg-white rounded-xl p-6 items-center border border-gray-100">
-                        <Text className="text-gray-500">No meals planned</Text>
+                    <View className="mb-4 bg-surface rounded-xl p-6 items-center border border-line">
+                        <Text className="text-muted">No meals planned</Text>
                         <AskAiEmptyCta
                             hint="Skip the forms — just tell the AI what you need."
                             label="Ask AI to plan this week"
@@ -279,8 +280,8 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                     </View>
                 )}
                 {pendingMeals.length > 0 && (
-                    <View className="mb-4 bg-orange-50 border border-orange-200 rounded-2xl p-3">
-                        <Text className="text-sm font-semibold text-gray-800 mb-2">
+                    <View className="mb-4 bg-sage border border-line rounded-2xl p-3">
+                        <Text className="text-sm font-semibold text-ink mb-2">
                             {pendingMeals.length === 1
                                 ? `Did you cook ${pendingMeals[0].meal_name}?`
                                 : 'Did you cook these meals?'}
@@ -288,26 +289,26 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                         {pendingMeals.map((item) => (
                             <View
                                 key={item.id}
-                                className="flex-row items-center justify-between bg-white rounded-xl px-3 py-2 mb-2 border border-orange-100"
+                                className="flex-row items-center justify-between bg-surface rounded-xl px-3 py-2 mb-2 border border-line"
                             >
                                 <View className="flex-1 mr-2">
-                                    <Text className="font-medium text-gray-800" numberOfLines={1}>
+                                    <Text className="font-medium text-ink" numberOfLines={1}>
                                         {item.meal_name}
                                     </Text>
-                                    <Text className="text-xs text-gray-500">{item.serving_date}</Text>
+                                    <Text className="text-xs text-muted">{item.serving_date}</Text>
                                 </View>
                                 <View className="flex-row gap-2">
                                     <TouchableOpacity
                                         onPress={() => handleConfirmMeal(item)}
-                                        className="bg-red-500 px-3 py-1.5 rounded-lg"
+                                        className="bg-herb px-3 py-1.5 rounded-lg"
                                     >
                                         <Text className="text-white text-xs font-medium">Mark cooked</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity
                                         onPress={() => handleSkipMeal(item)}
-                                        className="border border-gray-300 px-3 py-1.5 rounded-lg"
+                                        className="border border-line px-3 py-1.5 rounded-lg"
                                     >
-                                        <Text className="text-gray-600 text-xs font-medium">Didn't cook</Text>
+                                        <Text className="text-muted text-xs font-medium">Didn't cook</Text>
                                     </TouchableOpacity>
                                 </View>
                             </View>
@@ -319,15 +320,15 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                         {/* Month Navigation */}
                         <View className="flex-row justify-between items-center mb-4">
                             <TouchableOpacity onPress={() => setCurrentDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))}>
-                                <ChevronLeft size={28} color="#4b5563" />
+                                <ChevronLeft size={28} color={colors.muted} />
                             </TouchableOpacity>
 
-                            <Text className="text-xl font-bold text-gray-800">
+                            <Text className="text-xl font-bold text-ink">
                                 {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
                             </Text>
 
                             <TouchableOpacity onPress={() => setCurrentDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))}>
-                                <ChevronRight size={28} color="#4b5563" />
+                                <ChevronRight size={28} color={colors.muted} />
                             </TouchableOpacity>
                         </View>
 
@@ -342,19 +343,20 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                             markedDates={{
                                 [selectedDate ? formatDateString(selectedDate) : '']: {
                                     selected: true,
-                                    selectedColor: '#f97316',
+                                    selectedColor: colors.herb,
                                 },
                             }}
                             theme={{
                                 backgroundColor: 'transparent',
-                                calendarBackground: 'white',
-                                textSectionTitleColor: '#6b7280',
-                                selectedDayBackgroundColor: '#f97316',
-                                selectedDayTextColor: '#ffffff',
-                                todayTextColor: '#f97316',
-                                dayTextColor: '#374151',
-                                monthTextColor: '#111827',
-                                arrowColor: '#f97316',
+                                calendarBackground: colors.linen,
+                                textSectionTitleColor: colors.muted,
+                                selectedDayBackgroundColor: colors.herb,
+                                selectedDayTextColor: colors.onHerb,
+                                todayTextColor: colors.herb,
+                                dayTextColor: colors.ink,
+                                textDisabledColor: colors.muted,
+                                monthTextColor: colors.ink,
+                                arrowColor: colors.herb,
                             }}
                             hideExtraDays={false}
                             hideArrows={true}
@@ -368,9 +370,9 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
 
                 {/* Selected Day Content - Calendar View */}
                 {viewMode === 'calendar' && selectedDate && (
-                    <View className="mt-5 bg-white rounded-2xl p-4 mb-8 border border-gray-100 shadow-sm">
+                    <View className="mt-5 bg-surface rounded-2xl p-4 mb-8 border border-line shadow-sm">
                         <View className="flex-row justify-between items-center mb-4">
-                            <Text className="text-lg font-bold text-gray-800">
+                            <Text className="text-lg font-bold text-ink">
                                 {selectedDate.toLocaleDateString('en-US', {
                                     weekday: 'long',
                                     month: 'long',
@@ -380,7 +382,7 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
 
                             <TouchableOpacity
                                 onPress={() => setShowAddModal(true)}
-                                className="bg-red-500 px-4 py-2 rounded-xl"
+                                className="bg-herb px-4 py-2 rounded-xl"
                             >
                                 <Text className="text-white font-medium">+ Add</Text>
                             </TouchableOpacity>
@@ -393,7 +395,7 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                             return types.map((type) =>
                                 byType[type].length > 0 ? (
                                     <View key={type} className="mb-5">
-                                        <Text className="text-base font-semibold mb-2 capitalize text-gray-700">
+                                        <Text className="text-base font-semibold mb-2 capitalize text-ink">
                                             {type}
                                         </Text>
 
@@ -434,13 +436,13 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                                                     );
                                                     setShowRecipeDetail(true);
                                                 }}
-                                                className="bg-gray-50 p-4 rounded-xl mb-2.5 border border-gray-200"
+                                                className="bg-linen p-4 rounded-xl mb-2.5 border border-line"
                                             >
                                                 <View className="flex-row justify-between items-center">
                                                     <View className="flex-1 mr-2">
-                                                        <Text className="font-medium text-gray-800">{item.meal_name}</Text>
+                                                        <Text className="font-medium text-ink">{item.meal_name}</Text>
                                                         {item.status && item.status !== 'PLANNED' && (
-                                                            <Text className="text-xs text-gray-500 mt-0.5">
+                                                            <Text className="text-xs text-muted mt-0.5">
                                                                 {item.status === 'PENDING_CONFIRM' && 'Waiting: did you cook this?'}
                                                                 {item.status === 'CONFIRMED' && 'Cooked'}
                                                                 {item.status === 'SKIPPED' && "Didn't cook"}
@@ -455,13 +457,13 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                                                                     onPress={() => handleConfirmMeal(item)}
                                                                     className="p-2 mr-1"
                                                                 >
-                                                                    <Check size={20} color="#16a34a" />
+                                                                    <Check size={20} color={colors.herb} />
                                                                 </TouchableOpacity>
                                                                 <TouchableOpacity
                                                                     onPress={() => handleSkipMeal(item)}
                                                                     className="p-2 mr-1"
                                                                 >
-                                                                    <X size={20} color="#6b7280" />
+                                                                    <X size={20} color={colors.muted} />
                                                                 </TouchableOpacity>
                                                             </>
                                                         )}
@@ -471,7 +473,7 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                                                                 setShowDeleteConfirm(true);
                                                             }}
                                                         >
-                                                            <Trash2 size={20} color="#ef4444" />
+                                                            <Trash2 size={20} color={colors.danger} />
                                                         </TouchableOpacity>
                                                     </View>
                                                 </View>
@@ -495,10 +497,10 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                                     newD.setDate(d.getDate() - 7);
                                     return newD;
                                 })}
-                                className="flex-row items-center px-3 py-2 rounded-lg bg-gray-100"
+                                className="flex-row items-center px-3 py-2 rounded-lg bg-surface border border-line"
                             >
-                                <ChevronLeft size={16} color="#4b5563" />
-                                <Text className="text-gray-600 font-medium">Prev</Text>
+                                <ChevronLeft size={16} color={colors.muted} />
+                                <Text className="text-muted font-medium">Prev</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
@@ -511,9 +513,9 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                                     start.setHours(0, 0, 0, 0);
                                     setCurrentWeekStart(start);
                                 }}
-                                className="px-3 py-1.5 bg-blue-50 rounded-lg border border-blue-100"
+                                className="px-3 py-1.5 bg-sage rounded-lg border border-line"
                             >
-                                <Text className="text-blue-600 font-medium text-sm">Today</Text>
+                                <Text className="text-herb-deep font-medium text-sm">Today</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
@@ -522,14 +524,14 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                                     newD.setDate(d.getDate() + 7);
                                     return newD;
                                 })}
-                                className="flex-row items-center px-3 py-2 rounded-lg bg-gray-100"
+                                className="flex-row items-center px-3 py-2 rounded-lg bg-surface border border-line"
                             >
-                                <Text className="text-gray-600 font-medium">Next</Text>
-                                <ChevronRight size={16} color="#4b5563" />
+                                <Text className="text-muted font-medium">Next</Text>
+                                <ChevronRight size={16} color={colors.muted} />
                             </TouchableOpacity>
                         </View>
 
-                        <Text className="text-center font-semibold text-gray-800 mb-4">
+                        <Text className="text-center font-semibold text-ink mb-4">
                             {currentWeekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} —{' '}
                             {(() => {
                                 const end = new Date(currentWeekStart);
@@ -567,7 +569,7 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                                 return (
                                     <View
                                         key={dateStr}
-                                        className={`mb-2 rounded-xl overflow-hidden border ${isToday ? 'border-orange-300' : 'border-gray-200'} bg-white`}
+                                        className={`mb-2 rounded-xl overflow-hidden border ${isToday ? 'border-herb' : 'border-line'} bg-surface`}
                                     >
                                         <TouchableOpacity
                                             onPress={() => {
@@ -577,49 +579,49 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                                                     setExpandedDates([...expandedDates, dateStr]);
                                                 }
                                             }}
-                                            className={`px-4 py-3 flex-row justify-between items-center ${dayMeals.length > 0 ? 'bg-gray-50' : 'bg-white'}`}
+                                            className={`px-4 py-3 flex-row justify-between items-center ${dayMeals.length > 0 ? 'bg-linen' : 'bg-surface'}`}
                                         >
                                             <View className="flex-row items-center">
-                                                <CalendarIcon size={16} color="#6b7280" />
-                                                <Text className={`ml-2 font-medium ${isToday ? 'text-orange-600' : 'text-gray-800'}`}>
+                                                <CalendarIcon size={16} color={colors.muted} />
+                                                <Text className={`ml-2 font-medium ${isToday ? 'text-herb' : 'text-ink'}`}>
                                                     {formatDisplayDate(date)}
                                                 </Text>
                                                 {dayMeals.length > 0 && (
-                                                    <View className="bg-red-100 rounded-full px-2 py-0.5 ml-2">
-                                                        <Text className="text-red-700 text-xs font-medium">{dayMeals.length}</Text>
+                                                    <View className="bg-sage rounded-full px-2 py-0.5 ml-2">
+                                                        <Text className="text-herb-deep text-xs font-medium">{dayMeals.length}</Text>
                                                     </View>
                                                 )}
                                             </View>
                                             {dayMeals.length > 0 && (
-                                                isExpanded ? <ChevronUp size={18} color="#6b7280" /> : <ChevronDown size={18} color="#6b7280" />
+                                                isExpanded ? <ChevronUp size={18} color={colors.muted} /> : <ChevronDown size={18} color={colors.muted} />
                                             )}
                                         </TouchableOpacity>
 
                                         {isExpanded && dayMeals.length > 0 && (
-                                            <View className="border-t border-gray-100">
+                                            <View className="border-t border-line">
                                                 {dayMeals.map((item) => (
                                                     <View
                                                         key={item.id}
-                                                        className="px-4 py-3 flex-row justify-between items-center border-b border-gray-50"
+                                                        className="px-4 py-3 flex-row justify-between items-center border-b border-line"
                                                     >
                                                         <View className="flex-row items-center flex-1">
-                                                            <View className={`w-2 h-2 rounded-full mr-3 ${item.meal_type === 'breakfast' ? 'bg-blue-500' :
-                                                                    item.meal_type === 'lunch' ? 'bg-amber-500' :
-                                                                        item.meal_type === 'dinner' ? 'bg-red-500' : 'bg-green-500'
+                                                            <View className={`w-2 h-2 rounded-full mr-3 ${item.meal_type === 'breakfast' ? 'bg-sage' :
+                                                                    item.meal_type === 'lunch' ? 'bg-herb' :
+                                                                        item.meal_type === 'dinner' ? 'bg-herb-deep' : 'bg-muted'
                                                                 }`} />
                                                             <View className="flex-1">
-                                                                <Text className="font-medium text-gray-800">{item.meal_name}</Text>
-                                                                <Text className="text-xs text-gray-500 capitalize">{item.meal_type}</Text>
+                                                                <Text className="font-medium text-ink">{item.meal_name}</Text>
+                                                                <Text className="text-xs text-muted capitalize">{item.meal_type}</Text>
                                                             </View>
                                                         </View>
                                                         <View className="flex-row items-center">
                                                             {canActOnMeal(item) && (
                                                                 <>
                                                                     <TouchableOpacity onPress={() => handleConfirmMeal(item)} className="p-2">
-                                                                        <Check size={16} color="#16a34a" />
+                                                                        <Check size={16} color={colors.herb} />
                                                                     </TouchableOpacity>
                                                                     <TouchableOpacity onPress={() => handleSkipMeal(item)} className="p-2">
-                                                                        <X size={16} color="#6b7280" />
+                                                                        <X size={16} color={colors.muted} />
                                                                     </TouchableOpacity>
                                                                 </>
                                                             )}
@@ -630,7 +632,7 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                                                                 }}
                                                                 className="p-2"
                                                             >
-                                                                <Trash2 size={16} color="#ef4444" />
+                                                                <Trash2 size={16} color={colors.danger} />
                                                             </TouchableOpacity>
                                                         </View>
                                                     </View>
@@ -643,11 +645,11 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                                                 setSelectedDate(date);
                                                 setShowAddModal(true);
                                             }}
-                                            className="py-2 bg-gray-50 border-t border-gray-100"
+                                            className="py-2 bg-linen border-t border-line"
                                         >
                                             <View className="flex-row items-center justify-center">
-                                                <Plus size={14} color="#dc2626" />
-                                                <Text className="text-red-600 font-medium ml-1 text-sm">Add meal</Text>
+                                                <Plus size={14} color={colors.herb} />
+                                                <Text className="text-herb font-medium ml-1 text-sm">Add meal</Text>
                                             </View>
                                         </TouchableOpacity>
                                     </View>
@@ -668,28 +670,28 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                 onRequestClose={() => setShowAddModal(false)}
             >
                 <View className="flex-1 justify-end bg-black/50">
-                    <View className="bg-white rounded-t-3xl p-6 max-h-[85%]">
+                    <View className="bg-surface rounded-t-3xl p-6 max-h-[85%]">
                         <View className="flex-row justify-between items-center mb-5">
-                            <Text className="text-xl font-bold text-gray-800">Add to Calendar</Text>
+                            <Text className="text-xl font-bold text-ink">Add to Calendar</Text>
                             <TouchableOpacity onPress={() => setShowAddModal(false)}>
-                                <X size={28} color="#6b7280" />
+                                <X size={28} color={colors.muted} />
                             </TouchableOpacity>
                         </View>
 
                         {/* Meal Type */}
-                        <Text className="text-gray-700 font-medium mb-2">Meal Type</Text>
+                        <Text className="text-ink font-medium mb-2">Meal Type</Text>
                         <View className="flex-row flex-wrap gap-2 mb-6">
                             {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map((type) => (
                                 <TouchableOpacity
                                     key={type}
                                     onPress={() => setSelectedMealType(type)}
                                     className={`px-4 py-2.5 rounded-full border ${selectedMealType === type
-                                        ? 'bg-red-500 border-red-500'
-                                        : 'border-gray-300 bg-white'
+                                        ? 'bg-herb border-herb'
+                                        : 'border-line bg-surface'
                                         }`}
                                 >
                                     <Text
-                                        className={`capitalize ${selectedMealType === type ? 'text-white' : 'text-gray-700'
+                                        className={`capitalize ${selectedMealType === type ? 'text-white' : 'text-ink'
                                             }`}
                                     >
                                         {type}
@@ -699,15 +701,16 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                         </View>
 
                         {/* Recipe Search / Select */}
-                        <Text className="text-gray-700 font-medium mb-2">Recipe</Text>
+                        <Text className="text-ink font-medium mb-2">Recipe</Text>
                         <View className="relative mb-6">
                             <TextInput
-                                className="bg-gray-50 border border-gray-200 rounded-xl pl-10 py-3"
+                                className="bg-linen border border-line rounded-xl pl-10 py-3 text-ink"
                                 placeholder="Search recipe..."
+                                placeholderTextColor={colors.muted}
                                 value={searchQuery}
                                 onChangeText={setSearchQuery}
                             />
-                            <Search size={20} color="#9ca3af" className="absolute left-3 top-3.5" />
+                            <Search size={20} color={colors.muted} className="absolute left-3 top-3.5" />
                         </View>
 
                         {/* Recipe list - can be improved with FlatList */}
@@ -718,10 +721,10 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                                     <TouchableOpacity
                                         key={recipe.id}
                                         onPress={() => setSelectedRecipeId(recipe.id)}
-                                        className={`p-3 border-b border-gray-100 ${selectedRecipeId === recipe.id ? 'bg-red-50' : ''
+                                        className={`p-3 border-b border-line ${selectedRecipeId === recipe.id ? 'bg-sage' : ''
                                             }`}
                                     >
-                                        <Text className="text-gray-800">{recipe.meal_name}</Text>
+                                        <Text className="text-ink">{recipe.meal_name}</Text>
                                     </TouchableOpacity>
                                 ))}
                         </ScrollView>
@@ -729,15 +732,15 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                         <View className="flex-row gap-3">
                             <TouchableOpacity
                                 onPress={() => setShowAddModal(false)}
-                                className="flex-1 py-4 bg-gray-200 rounded-xl"
+                                className="flex-1 py-4 bg-linen border border-line rounded-xl"
                             >
-                                <Text className="text-center font-medium text-gray-700">Cancel</Text>
+                                <Text className="text-center font-medium text-ink">Cancel</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
                                 onPress={handleAddMeal}
                                 disabled={!selectedRecipeId}
-                                className={`flex-1 py-4 rounded-xl ${selectedRecipeId ? 'bg-red-500' : 'bg-gray-300'
+                                className={`flex-1 py-4 rounded-xl ${selectedRecipeId ? 'bg-herb' : 'bg-sage'
                                     }`}
                             >
                                 <Text className="text-center font-medium text-white">Add</Text>
@@ -750,27 +753,27 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
             {/* Delete Confirmation */}
             <Modal visible={showDeleteConfirm} transparent animationType="fade">
                 <View className="flex-1 justify-center items-center bg-black/60 px-5">
-                    <View className="bg-white rounded-2xl p-6 w-full max-w-sm">
+                    <View className="bg-surface rounded-2xl p-6 w-full max-w-sm">
                         <View className="flex-row items-center mb-4">
-                            <AlertCircle size={28} color="#ef4444" />
-                            <Text className="ml-3 text-xl font-bold text-gray-800">Delete?</Text>
+                            <AlertCircle size={28} color={colors.danger} />
+                            <Text className="ml-3 text-xl font-bold text-ink">Delete?</Text>
                         </View>
 
-                        <Text className="text-gray-600 mb-6">
+                        <Text className="text-muted mb-6">
                             Are you sure you want to remove this meal plan?
                         </Text>
 
                         <View className="flex-row gap-3">
                             <TouchableOpacity
                                 onPress={() => setShowDeleteConfirm(false)}
-                                className="flex-1 py-3.5 bg-gray-200 rounded-xl"
+                                className="flex-1 py-3.5 bg-linen border border-line rounded-xl"
                             >
-                                <Text className="text-center font-medium">Cancel</Text>
+                                <Text className="text-center font-medium text-ink">Cancel</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
                                 onPress={handleDelete}
-                                className="flex-1 py-3.5 bg-red-500 rounded-xl"
+                                className="flex-1 py-3.5 bg-herb-deep rounded-xl"
                             >
                                 <Text className="text-center font-medium text-white">Delete</Text>
                             </TouchableOpacity>
@@ -790,9 +793,9 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                 }}
             >
                 <View className="flex-1 bg-black/50 justify-end">
-                    <View className="bg-white rounded-t-3xl max-h-[85%]">
-                        <View className="p-4 border-b border-gray-100 flex-row justify-between items-start">
-                            <Text className="text-xl font-bold text-gray-800 flex-1 mr-3">
+                    <View className="bg-surface rounded-t-3xl max-h-[85%]">
+                        <View className="p-4 border-b border-line flex-row justify-between items-start">
+                            <Text className="text-xl font-bold text-ink flex-1 mr-3">
                                 {selectedRecipeDetail?.meal_name || 'Recipe'}
                             </Text>
                             <TouchableOpacity
@@ -802,53 +805,53 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                                 }}
                                 className="p-1"
                             >
-                                <X size={24} color="#6b7280" />
+                                <X size={24} color={colors.muted} />
                             </TouchableOpacity>
                         </View>
 
                         <ScrollView className="px-4 py-4">
                             {(selectedRecipeDetail?.ingredients?.length ?? 0) > 0 ? (
                                 <View className="mb-6">
-                                    <Text className="text-lg font-semibold text-gray-800 mb-3">Ingredients</Text>
+                                    <Text className="text-lg font-semibold text-ink mb-3">Ingredients</Text>
                                     {selectedRecipeDetail!.ingredients.map((ing, index) => (
-                                        <View key={index} className="flex-row justify-between py-2 border-b border-gray-100">
-                                            <Text className="text-gray-800 capitalize flex-1">{ing.name}</Text>
-                                            <Text className="text-gray-500">
+                                        <View key={index} className="flex-row justify-between py-2 border-b border-line">
+                                            <Text className="text-ink capitalize flex-1">{ing.name}</Text>
+                                            <Text className="text-muted">
                                                 {ing.quantity} {ing.unit}
                                             </Text>
                                         </View>
                                     ))}
                                 </View>
                             ) : (
-                                <Text className="text-gray-500 mb-6">No ingredients listed for this recipe.</Text>
+                                <Text className="text-muted mb-6">No ingredients listed for this recipe.</Text>
                             )}
 
                             <View className="mb-8">
-                                <Text className="text-lg font-semibold text-gray-800 mb-3">Instructions</Text>
+                                <Text className="text-lg font-semibold text-ink mb-3">Instructions</Text>
                                 {(selectedRecipeDetail?.instructions?.length ?? 0) > 0 ? (
                                     selectedRecipeDetail!.instructions.map((step, index) => (
                                         <View key={index} className="flex-row mb-3">
-                                            <View className="w-6 h-6 rounded-full bg-orange-100 items-center justify-center mr-3 mt-0.5">
-                                                <Text className="text-xs font-medium text-orange-700">{index + 1}</Text>
+                                            <View className="w-6 h-6 rounded-full bg-sage items-center justify-center mr-3 mt-0.5">
+                                                <Text className="text-xs font-medium text-herb-deep">{index + 1}</Text>
                                             </View>
-                                            <Text className="flex-1 text-gray-800 leading-5">{step}</Text>
+                                            <Text className="flex-1 text-ink leading-5">{step}</Text>
                                         </View>
                                     ))
                                 ) : (
-                                    <Text className="text-gray-500">No instructions available for this recipe.</Text>
+                                    <Text className="text-muted">No instructions available for this recipe.</Text>
                                 )}
                             </View>
                         </ScrollView>
 
-                        <View className="p-4 border-t border-gray-100">
+                        <View className="p-4 border-t border-line">
                             <TouchableOpacity
                                 onPress={() => {
                                     setShowRecipeDetail(false);
                                     setSelectedRecipeDetail(null);
                                 }}
-                                className="bg-gray-100 py-3 rounded-xl"
+                                className="bg-linen border border-line py-3 rounded-xl"
                             >
-                                <Text className="text-center text-gray-800 font-medium">Close</Text>
+                                <Text className="text-center text-ink font-medium">Close</Text>
                             </TouchableOpacity>
                         </View>
                     </View>

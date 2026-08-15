@@ -1,3 +1,15 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Warm Kitchen tokens — keep in sync with frontend/src/index.css */
+:root {
+  --ink: #1f2420;
+  --muted: #5e675f;
+  --linen: #f3f0e8;
+  --surface: #faf8f3;
+  --herb: #4f6b4a;
+  --herb-deep: #3a5238;
+  --sage: #d8e0d0;
+  --line: #ddd8cc;
+}

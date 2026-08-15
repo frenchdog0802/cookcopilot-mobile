@@ -11,6 +11,7 @@ import {
   VOLUME_UNITS,
   COUNT_UNITS,
 } from '../utils/units';
+import { colors } from '../theme/tokens';
 
 type UnitSelectProps = {
   kind?: UnitKind | string | null;
@@ -145,25 +146,25 @@ const styles = StyleSheet.create({
   },
   chip: {
     borderWidth: 1,
-    borderColor: '#d4d4d4',
+    borderColor: colors.line,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
   },
   chipSelected: {
-    borderColor: '#16a34a',
-    backgroundColor: '#dcfce7',
+    borderColor: colors.herb,
+    backgroundColor: colors.sage,
   },
   chipLocked: {
     opacity: 0.75,
   },
   chipText: {
-    color: '#374151',
+    color: colors.ink,
     fontSize: 13,
   },
   chipTextSelected: {
-    color: '#166534',
+    color: colors.herbDeep,
     fontWeight: '600',
   },
 });

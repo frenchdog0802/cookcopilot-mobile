@@ -11,6 +11,11 @@ export interface AuthResponse {
 
 interface AuthContextType {
     user: User | null;
+    /** True only while restoring session on app launch */
+    initializing: boolean;
+    /** True while login/signup request is in flight */
+    submitting: boolean;
+    /** @deprecated use initializing — kept so AuthCheck migration is obvious */
     loading: boolean;
     signUp: (user: User, password: string) => Promise<AuthResponse>;
     login: (email: string, password: string) => Promise<AuthResponse>;
@@ -22,7 +27,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [initializing, setInitializing] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -43,7 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 console.error('Auth check error:', error);
                 await AsyncStorage.removeItem('user');
             } finally {
-                setLoading(false);
+                setInitializing(false);
             }
         };
 
@@ -51,11 +57,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     const signUp = async (userData: User, password: string): Promise<AuthResponse> => {
-        setLoading(true);
+        setSubmitting(true);
         const authResponse: AuthResponse = { success: false };
 
         try {
+            console.log('[auth] signup start', userData.email);
             const response = await auth.signup(userData, password);
+            console.log('[auth] signup response', response?.success, response?.message);
 
             if (response && response.success && response.data) {
                 const createdUser = response.data.user;
@@ -71,18 +79,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.error('Error during sign up:', error);
             authResponse.message = 'An error occurred during sign up';
         } finally {
-            setLoading(false);
+            setSubmitting(false);
         }
 
         return authResponse;
     };
 
     const login = async (email: string, password: string): Promise<AuthResponse> => {
-        setLoading(true);
+        setSubmitting(true);
         const authResponse: AuthResponse = { success: false };
 
         try {
+            console.log('[auth] login start', email);
             const response = await auth.signin(email, password);
+            console.log('[auth] login response', response?.success, response?.message);
 
             if (response && response.data && response.success) {
                 await authHelper.authenticate(response.data.token);
@@ -97,7 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.error('Error logging in:', error);
             authResponse.message = 'An error occurred during login';
         } finally {
-            setLoading(false);
+            setSubmitting(false);
         }
 
         return authResponse;
@@ -111,7 +121,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const value = {
         user,
-        loading,
+        initializing,
+        submitting,
+        loading: initializing,
         login,
         logout,
         isAuthenticated: !!user,

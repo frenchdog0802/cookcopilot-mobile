@@ -1,10 +1,24 @@
-import "./global.css"
-import React, { useEffect } from 'react';
+import './global.css';
+import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts } from 'expo-font';
+import {
+  Fraunces_400Regular,
+  Fraunces_500Medium,
+  Fraunces_600SemiBold,
+  Fraunces_700Bold,
+} from '@expo-google-fonts/fraunces';
+import {
+  SourceSans3_300Light,
+  SourceSans3_400Regular,
+  SourceSans3_500Medium,
+  SourceSans3_600SemiBold,
+  SourceSans3_700Bold,
+} from '@expo-google-fonts/source-sans-3';
 import {
   House as HouseIcon,
   Calendar as CalendarIcon,
@@ -14,7 +28,6 @@ import {
   Settings as SettingsIcon,
 } from 'lucide-react-native';
 
-// Screens
 import LoadingScreen from './src/screens/LoadingScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import SignUpScreen from './src/screens/SignUpScreen';
@@ -27,21 +40,17 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import AICookingAssistantScreen from './src/screens/AICookingAssistantScreen';
 import SubscriptionScreen from './src/screens/SubscriptionScreen';
 
-// Contexts
 import { AuthProvider, useAuth } from './src/contexts/authContext';
 import { PantryProvider } from './src/contexts/pantryContext';
-
-// TODO: [EXPO GO STUB] Uncomment for production builds with native IAP
-// import iapService from './src/services/iapService';
+import { colors } from './src/theme/tokens';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Move these INSIDE the AuthProvider
 function AuthCheck({ children }: { children: React.ReactNode }) {
-  const { loading } = useAuth();
+  const { initializing } = useAuth();
 
-  if (loading) {
+  if (initializing) {
     return <LoadingScreen fullScreen />;
   }
 
@@ -87,12 +96,12 @@ function MainTabs() {
   return (
     <Tab.Navigator
       screenOptions={{
-        tabBarActiveTintColor: '#f97316',
-        tabBarInactiveTintColor: '#6b7280',
+        tabBarActiveTintColor: colors.herb,
+        tabBarInactiveTintColor: colors.muted,
         tabBarStyle: {
-          backgroundColor: '#ffffff',
+          backgroundColor: colors.linen,
           borderTopWidth: 1,
-          borderTopColor: '#e5e7eb',
+          borderTopColor: colors.line,
           paddingTop: 8,
           paddingBottom: 8,
           height: 75,
@@ -153,12 +162,32 @@ function MainTabs() {
 }
 
 function App() {
+  const [fontsLoaded, fontError] = useFonts({
+    Fraunces_400Regular,
+    Fraunces_500Medium,
+    Fraunces_600SemiBold,
+    Fraunces_700Bold,
+    SourceSans3_300Light,
+    SourceSans3_400Regular,
+    SourceSans3_500Medium,
+    SourceSans3_600SemiBold,
+    SourceSans3_700Bold,
+  });
+
+  if (!fontsLoaded && !fontError) {
+    return (
+      <SafeAreaProvider>
+        <LoadingScreen fullScreen />
+      </SafeAreaProvider>
+    );
+  }
+
   return (
     <SafeAreaProvider>
       <AuthProvider>
         <PantryProvider>
           <NavigationContainer>
-            <StatusBar style="auto" />
+            <StatusBar style="dark" />
             <AuthCheck>
               <RootNavigator />
             </AuthCheck>
@@ -169,5 +198,4 @@ function App() {
   );
 }
 
-// Export App directly (no wrapper needed for react-native-iap v14)
 export default App;

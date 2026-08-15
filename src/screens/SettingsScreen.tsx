@@ -6,6 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 import { UserIcon, SettingsIcon, SaveIcon, CheckIcon } from 'lucide-react-native';
 import AppHeader from '../components/AppHeader';
 import { userPreferencesApi } from '../api/userPreferences';
+import { colors } from '../theme/tokens';
 
 export default function SettingsScreen() {
     const { logout, user } = useAuth();
@@ -70,38 +71,38 @@ export default function SettingsScreen() {
 
     const RadioButton = ({ selected, onPress, label }: { selected: boolean; onPress: () => void; label: string }) => (
         <TouchableOpacity onPress={onPress} className="flex-row items-center py-2">
-            <View className={`w-5 h-5 rounded-full border-2 mr-3 items-center justify-center ${selected ? 'border-orange-500' : 'border-gray-300'}`}>
-                {selected && <View className="w-2.5 h-2.5 rounded-full bg-orange-500" />}
+            <View className={`w-5 h-5 rounded-full border-2 mr-3 items-center justify-center ${selected ? 'border-herb' : 'border-line'}`}>
+                {selected && <View className="w-2.5 h-2.5 rounded-full bg-herb" />}
             </View>
-            <Text className="text-gray-700">{label}</Text>
+            <Text className="text-ink">{label}</Text>
         </TouchableOpacity>
     );
 
     return (
-        <View className="flex-1 bg-gray-50">
+        <View className="flex-1 bg-linen">
             <AppHeader title="Settings" showBackButton />
             <ScrollView className="flex-1">
 
                 {/* Main Content */}
                 <View className="p-4">
-                    <View className="bg-white rounded-xl shadow-sm overflow-hidden">
+                    <View className="bg-surface rounded-xl overflow-hidden border border-line">
                         {/* Tabs */}
-                        <View className="flex-row border-b border-gray-200">
+                        <View className="flex-row border-b border-line">
                             <TouchableOpacity
-                                className={`flex-1 flex-row items-center justify-center py-4 ${activeTab === 'profile' ? 'border-b-2 border-orange-500' : ''}`}
+                                className={`flex-1 flex-row items-center justify-center py-4 ${activeTab === 'profile' ? 'border-b-2 border-herb' : ''}`}
                                 onPress={() => setActiveTab('profile')}
                             >
-                                <UserIcon size={16} color={activeTab === 'profile' ? '#f97316' : '#6b7280'} />
-                                <Text className={`ml-1 text-sm font-medium ${activeTab === 'profile' ? 'text-orange-600' : 'text-gray-600'}`}>
+                                <UserIcon size={16} color={activeTab === 'profile' ? colors.herb : colors.muted} />
+                                <Text className={`ml-1 text-sm font-medium ${activeTab === 'profile' ? 'text-herb' : 'text-muted'}`}>
                                     Profile
                                 </Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                className={`flex-1 flex-row items-center justify-center py-4 ${activeTab === 'preferences' ? 'border-b-2 border-orange-500' : ''}`}
+                                className={`flex-1 flex-row items-center justify-center py-4 ${activeTab === 'preferences' ? 'border-b-2 border-herb' : ''}`}
                                 onPress={() => setActiveTab('preferences')}
                             >
-                                <SettingsIcon size={16} color={activeTab === 'preferences' ? '#f97316' : '#6b7280'} />
-                                <Text className={`ml-1 text-sm font-medium ${activeTab === 'preferences' ? 'text-orange-600' : 'text-gray-600'}`}>
+                                <SettingsIcon size={16} color={activeTab === 'preferences' ? colors.herb : colors.muted} />
+                                <Text className={`ml-1 text-sm font-medium ${activeTab === 'preferences' ? 'text-herb' : 'text-muted'}`}>
                                     Units
                                 </Text>
                             </TouchableOpacity>
@@ -109,7 +110,7 @@ export default function SettingsScreen() {
                                 className={`flex-1 flex-row items-center justify-center py-4`}
                                 onPress={() => navigation.navigate('Subscription' as never)}
                             >
-                                <Text className="ml-1 text-sm font-medium text-orange-600">
+                                <Text className="ml-1 text-sm font-medium text-herb">
                                     Upgrade
                                 </Text>
                             </TouchableOpacity>
@@ -119,34 +120,34 @@ export default function SettingsScreen() {
                         <View className="p-4">
                             {activeTab === 'profile' && (
                                 <View>
-                                    <Text className="text-lg font-semibold text-gray-800 mb-4">
+                                    <Text className="text-lg font-semibold text-ink mb-4">
                                         Profile Information
                                     </Text>
                                     <View className="mb-4">
-                                        <Text className="text-sm font-medium text-gray-700 mb-1">Name</Text>
+                                        <Text className="text-sm font-medium text-ink mb-1">Name</Text>
                                         <TextInput
                                             value={name}
                                             onChangeText={setName}
-                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white"
+                                            className="w-full px-4 py-3 border border-line rounded-lg bg-linen text-ink"
                                             placeholder="Your name"
                                         />
                                     </View>
                                     <View className="mb-4">
-                                        <Text className="text-sm font-medium text-gray-700 mb-1">Email</Text>
+                                        <Text className="text-sm font-medium text-ink mb-1">Email</Text>
                                         <TextInput
                                             value={email}
                                             onChangeText={setEmail}
                                             keyboardType="email-address"
                                             autoCapitalize="none"
-                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white"
+                                            className="w-full px-4 py-3 border border-line rounded-lg bg-linen text-ink"
                                             placeholder="your@email.com"
                                         />
                                     </View>
                                     <TouchableOpacity
                                         onPress={handleSave}
-                                        className="bg-orange-500 py-3 px-4 rounded-lg flex-row items-center justify-center"
+                                        className="bg-herb py-3 px-4 rounded-lg flex-row items-center justify-center"
                                     >
-                                        <SaveIcon size={18} color="white" />
+                                        <SaveIcon size={18} color={colors.onHerb} />
                                         <Text className="text-white font-medium ml-2">Save Changes</Text>
                                     </TouchableOpacity>
                                 </View>
@@ -154,7 +155,7 @@ export default function SettingsScreen() {
 
                             {activeTab === 'preferences' && (
                                 <View>
-                                    <Text className="text-lg font-semibold text-gray-800 mb-4">
+                                    <Text className="text-lg font-semibold text-ink mb-4">
                                         Measurement Units
                                     </Text>
                                     <View className="space-y-2">
@@ -171,13 +172,13 @@ export default function SettingsScreen() {
                                     </View>
                                     <TouchableOpacity
                                         onPress={handleSave}
-                                        className="bg-orange-500 py-3 px-4 rounded-lg flex-row items-center justify-center mt-4"
+                                        className="bg-herb py-3 px-4 rounded-lg flex-row items-center justify-center mt-4"
                                     >
-                                        <SaveIcon size={18} color="white" />
+                                        <SaveIcon size={18} color={colors.onHerb} />
                                         <Text className="text-white font-medium ml-2">Save Changes</Text>
                                     </TouchableOpacity>
                                     {errorMessage ? (
-                                        <Text className="text-red-500 text-sm mt-2">{errorMessage}</Text>
+                                        <Text className="text-sm mt-2" style={{ color: colors.danger }}>{errorMessage}</Text>
                                     ) : null}
                                 </View>
                             )}
@@ -187,16 +188,16 @@ export default function SettingsScreen() {
                     {/* Sign Out Button */}
                     <TouchableOpacity
                         onPress={handleLogout}
-                        className="bg-gray-200 py-4 rounded-lg mt-6"
+                        className="bg-linen border border-line py-4 rounded-lg mt-6"
                     >
-                        <Text className="text-gray-700 text-center font-medium">Sign Out</Text>
+                        <Text className="text-ink text-center font-medium">Sign Out</Text>
                     </TouchableOpacity>
 
                     {/* Save Message Toast */}
                     {showSaveMessage && (
-                        <View className="absolute bottom-4 left-4 right-4 bg-green-100 p-4 rounded-lg flex-row items-center">
-                            <CheckIcon size={20} color="#166534" />
-                            <Text className="text-green-800 ml-2">Changes saved successfully!</Text>
+                        <View className="absolute bottom-4 left-4 right-4 bg-sage border border-line p-4 rounded-lg flex-row items-center">
+                            <CheckIcon size={20} color={colors.herbDeep} />
+                            <Text className="text-herb-deep ml-2">Changes saved successfully!</Text>
                         </View>
                     )}
                 </View>

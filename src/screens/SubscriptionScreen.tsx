@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import AppHeader from '../components/AppHeader';
 import { useSubscription, getSubscriptionPeriodLabel } from '../services/iapService';
+import { colors } from '../theme/tokens';
 
 export default function SubscriptionScreen() {
     const {
@@ -29,14 +30,14 @@ export default function SubscriptionScreen() {
 
     if (isPro) {
         return (
-            <View className="flex-1 bg-gray-50">
+            <View className="flex-1 bg-linen">
                 <AppHeader title="Subscription" showBackButton />
                 <View className="flex-1 items-center justify-center p-6">
                     <Text className="text-4xl mb-4">✨</Text>
-                    <Text className="text-2xl font-bold text-gray-800 mb-2">
+                    <Text className="text-2xl font-bold text-ink mb-2">
                         {isTrial ? "You're on Pro trial" : "You're a Pro member"}
                     </Text>
-                    <Text className="text-gray-500 text-center">
+                    <Text className="text-muted text-center">
                         {isTrial
                             ? 'Enjoy full Pro limits during your 7-day trial, including high-volume AI and social imports.'
                             : 'Thank you for subscribing. Enjoy high-volume AI chat and social recipe imports.'}
@@ -47,32 +48,32 @@ export default function SubscriptionScreen() {
     }
 
     return (
-        <View className="flex-1 bg-gray-50">
+        <View className="flex-1 bg-linen">
             <AppHeader title="Upgrade to Pro" showBackButton />
 
             <ScrollView contentContainerStyle={{ padding: 16 }}>
-                <Text className="text-2xl font-bold text-center mb-2 text-gray-800">
+                <Text className="text-2xl font-bold text-center mb-2 text-ink">
                     Unlock Pro
                 </Text>
-                <Text className="text-gray-500 text-center mb-8">
+                <Text className="text-muted text-center mb-8">
                     High-volume AI assistant plus YouTube and Instagram recipe imports.
                 </Text>
 
                 {loading ? (
-                    <ActivityIndicator size="large" color="#f97316" />
+                    <ActivityIndicator size="large" color={colors.herb} />
                 ) : (
                     <View className="gap-4">
                         {products.map((product) => (
                             <View
                                 key={product.productId}
-                                className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm"
+                                className="bg-surface p-6 rounded-2xl border border-line"
                             >
                                 <View className="flex-row justify-between items-center mb-4">
-                                    <Text className="text-xl font-bold text-gray-800">
+                                    <Text className="text-xl font-bold text-ink">
                                         {product.title}
                                     </Text>
-                                    <View className="bg-orange-100 px-3 py-1 rounded-full">
-                                        <Text className="text-orange-600 font-bold">
+                                    <View className="bg-sage px-3 py-1 rounded-full">
+                                        <Text className="text-herb-deep font-bold">
                                             {product.localizedPrice}
                                             /{getSubscriptionPeriodLabel(product.productId)}
                                         </Text>
@@ -91,11 +92,11 @@ export default function SubscriptionScreen() {
                                 <TouchableOpacity
                                     onPress={() => purchase(product.productId)}
                                     disabled={purchasing}
-                                    className={`py-4 rounded-xl items-center ${purchasing ? 'bg-gray-300' : 'bg-orange-500'
+                                    className={`py-4 rounded-xl items-center ${purchasing ? 'bg-sage' : 'bg-herb'
                                         }`}
                                 >
                                     {purchasing ? (
-                                        <ActivityIndicator color="white" />
+                                        <ActivityIndicator color={colors.onHerb} />
                                     ) : (
                                         <Text className="text-white font-bold text-lg">Subscribe Now</Text>
                                     )}
@@ -105,8 +106,8 @@ export default function SubscriptionScreen() {
 
                         {products.length === 0 && !loading && (
                             <View className="items-center py-8">
-                                <Text className="text-gray-500">No subscription options available.</Text>
-                                <Text className="text-gray-400 text-sm mt-2">
+                                <Text className="text-muted">No subscription options available.</Text>
+                                <Text className="text-muted text-sm mt-2">
                                     Please check back later or contact support.
                                 </Text>
                             </View>
@@ -120,17 +121,17 @@ export default function SubscriptionScreen() {
                     className="mt-6 py-3 items-center"
                 >
                     {restoring ? (
-                        <ActivityIndicator color="#f97316" />
+                        <ActivityIndicator color={colors.herb} />
                     ) : (
-                        <Text className="text-orange-500 font-medium">Restore Purchases</Text>
+                        <Text className="text-herb font-medium">Restore Purchases</Text>
                     )}
                 </TouchableOpacity>
 
                 <View className="mt-4 items-center gap-2">
-                    <Text className="text-gray-400 text-xs text-center">
+                    <Text className="text-muted text-xs text-center">
                         Payment will be charged to your {Platform.OS === 'ios' ? 'Apple ID' : 'Google Play'} account.
                     </Text>
-                    <Text className="text-gray-400 text-xs text-center">
+                    <Text className="text-muted text-xs text-center">
                         New accounts include a 7-day Pro trial. Subscription auto-renews unless cancelled 24 hours before the end of the current period.
                     </Text>
                 </View>
@@ -142,8 +143,8 @@ export default function SubscriptionScreen() {
 function FeatureRow({ text, highlight = false }: { text: string; highlight?: boolean }) {
     return (
         <View className="flex-row items-center gap-2">
-            <Text className={highlight ? 'text-orange-500' : 'text-green-500'}>✓</Text>
-            <Text className={highlight ? 'text-orange-600 font-medium' : 'text-gray-600'}>{text}</Text>
+            <Text className={highlight ? 'text-herb' : 'text-herb'}>✓</Text>
+            <Text className={highlight ? 'text-herb-deep font-medium' : 'text-muted'}>{text}</Text>
         </View>
     );
 }
