@@ -37,6 +37,7 @@ import {
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import AppHeader from '../components/AppHeader';
+import AskAiEmptyCta from '../components/AskAiEmptyCta';
 import { UnitSelect, QuantityLabel, preferredUnitForIngredient } from '../components/UnitSelect';
 import type { MeasurementSystem } from '../utils/units';
 
@@ -909,6 +910,18 @@ export default function RecipeManagerScreen() {
                             {filteredRecipes.length === 0 ? (
                                 <View className="bg-white rounded-xl p-6 items-center">
                                     <Text className="text-gray-500">No recipes found</Text>
+                                    {!searchQuery && (
+                                        <AskAiEmptyCta
+                                            hint="Skip the forms — just tell the AI what you need."
+                                            label="Ask AI to import a recipe"
+                                            onPress={() =>
+                                                navigation.navigate(
+                                                    'AICookingAssistant' as never,
+                                                    { initialPrompt: 'Import a recipe from a URL' } as never,
+                                                )
+                                            }
+                                        />
+                                    )}
                                 </View>
                             ) : (
                                 <FlatList

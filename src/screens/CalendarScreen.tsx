@@ -31,6 +31,7 @@ import type { MealPlan, Recipe } from '../types';
 import { recipeApi } from '../api/recipe';
 import { useNavigation } from '@react-navigation/native';
 import AppHeader from '../components/AppHeader';
+import AskAiEmptyCta from '../components/AskAiEmptyCta';
 
 const { width } = Dimensions.get('window');
 
@@ -197,11 +198,11 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                     .map((s) => `${s.name} (had ${s.available}${s.unit}, needed ${s.needed}${s.unit})`)
                     .join('\n');
                 Alert.alert(
-                    'Confirmed with pantry shortfall',
+                    'Marked cooked — pantry shortfall',
                     `Pantry was updated (clamped at 0).\n\n${summary}\n\nYou can adjust stock in Pantry.`
                 );
             } else {
-                Alert.alert('Meal confirmed', `${item.meal_name} — pantry updated.`);
+                Alert.alert('Marked cooked', `${item.meal_name} — pantry updated.`);
             }
         }
     };
@@ -212,7 +213,7 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
             setMealPlans((prev) =>
                 prev.map((mp) => (mp.id === item.id ? { ...mp, status: 'SKIPPED' } : mp))
             );
-            Alert.alert('Skipped', `${item.meal_name} — no pantry change.`);
+            Alert.alert("Didn't cook", `${item.meal_name} — no pantry change.`);
         }
     };
 
@@ -262,12 +263,27 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
             </View>
 
             <ScrollView className="flex-1 px-4 pt-3">
+                {mealPlans.length === 0 && (
+                    <View className="mb-4 bg-white rounded-xl p-6 items-center border border-gray-100">
+                        <Text className="text-gray-500">No meals planned</Text>
+                        <AskAiEmptyCta
+                            hint="Skip the forms — just tell the AI what you need."
+                            label="Ask AI to plan this week"
+                            onPress={() =>
+                                navigation.navigate(
+                                    'AICookingAssistant' as never,
+                                    { initialPrompt: 'Plan dinners for the rest of this week' } as never,
+                                )
+                            }
+                        />
+                    </View>
+                )}
                 {pendingMeals.length > 0 && (
                     <View className="mb-4 bg-orange-50 border border-orange-200 rounded-2xl p-3">
                         <Text className="text-sm font-semibold text-gray-800 mb-2">
                             {pendingMeals.length === 1
                                 ? `Did you cook ${pendingMeals[0].meal_name}?`
-                                : `${pendingMeals.length} meals waiting for confirmation`}
+                                : 'Did you cook these meals?'}
                         </Text>
                         {pendingMeals.map((item) => (
                             <View
@@ -285,13 +301,13 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                                         onPress={() => handleConfirmMeal(item)}
                                         className="bg-red-500 px-3 py-1.5 rounded-lg"
                                     >
-                                        <Text className="text-white text-xs font-medium">Done</Text>
+                                        <Text className="text-white text-xs font-medium">Mark cooked</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity
                                         onPress={() => handleSkipMeal(item)}
                                         className="border border-gray-300 px-3 py-1.5 rounded-lg"
                                     >
-                                        <Text className="text-gray-600 text-xs font-medium">Skip</Text>
+                                        <Text className="text-gray-600 text-xs font-medium">Didn't cook</Text>
                                     </TouchableOpacity>
                                 </View>
                             </View>
@@ -425,9 +441,9 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                                                         <Text className="font-medium text-gray-800">{item.meal_name}</Text>
                                                         {item.status && item.status !== 'PLANNED' && (
                                                             <Text className="text-xs text-gray-500 mt-0.5">
-                                                                {item.status === 'PENDING_CONFIRM' && 'Awaiting confirmation'}
+                                                                {item.status === 'PENDING_CONFIRM' && 'Waiting: did you cook this?'}
                                                                 {item.status === 'CONFIRMED' && 'Cooked'}
-                                                                {item.status === 'SKIPPED' && 'Skipped'}
+                                                                {item.status === 'SKIPPED' && "Didn't cook"}
                                                             </Text>
                                                         )}
                                                     </View>

@@ -1,9 +1,3 @@
-/**
- * SubscriptionScreen - Native IAP Subscription UI
- * 
- * Uses react-native-iap v14 hook-based API for App Store / Play Store purchases.
- */
-
 import React, { useEffect } from 'react';
 import {
     View,
@@ -23,26 +17,29 @@ export default function SubscriptionScreen() {
         purchasing,
         restoring,
         isPro,
+        isTrial,
         fetchProducts,
         purchase,
         restore,
     } = useSubscription();
 
-    // Fetch products on mount
     useEffect(() => {
         fetchProducts();
     }, [fetchProducts]);
 
-    // Already Pro - show status
     if (isPro) {
         return (
             <View className="flex-1 bg-gray-50">
                 <AppHeader title="Subscription" showBackButton />
                 <View className="flex-1 items-center justify-center p-6">
                     <Text className="text-4xl mb-4">✨</Text>
-                    <Text className="text-2xl font-bold text-gray-800 mb-2">You're a Pro!</Text>
+                    <Text className="text-2xl font-bold text-gray-800 mb-2">
+                        {isTrial ? "You're on Pro trial" : "You're a Pro member"}
+                    </Text>
                     <Text className="text-gray-500 text-center">
-                        Thank you for subscribing. Enjoy unlimited access to all features.
+                        {isTrial
+                            ? 'Enjoy full Pro limits during your 7-day trial, including high-volume AI and social imports.'
+                            : 'Thank you for subscribing. Enjoy high-volume AI chat and social recipe imports.'}
                     </Text>
                 </View>
             </View>
@@ -55,10 +52,10 @@ export default function SubscriptionScreen() {
 
             <ScrollView contentContainerStyle={{ padding: 16 }}>
                 <Text className="text-2xl font-bold text-center mb-2 text-gray-800">
-                    Unlock Premium Features
+                    Unlock Pro
                 </Text>
                 <Text className="text-gray-500 text-center mb-8">
-                    Get unlimited AI recipes, advanced analytics, and more.
+                    High-volume AI assistant plus YouTube and Instagram recipe imports.
                 </Text>
 
                 {loading ? (
@@ -83,11 +80,11 @@ export default function SubscriptionScreen() {
                                 </View>
 
                                 <View className="mb-6 gap-2">
-                                    <FeatureRow text="Unlimited AI Chat" />
-                                    <FeatureRow text="Advanced Meal Planning" />
-                                    <FeatureRow text="Priority Support" />
+                                    <FeatureRow text="200 AI messages per day" />
+                                    <FeatureRow text="50 URL / YouTube / Instagram imports per month" />
+                                    <FeatureRow text="Unlimited recipes and image uploads" />
                                     {product.productId.includes('yearly') && (
-                                        <FeatureRow text="Save 20% vs Monthly" highlight />
+                                        <FeatureRow text="Save ~33% vs monthly" highlight />
                                     )}
                                 </View>
 
@@ -106,7 +103,6 @@ export default function SubscriptionScreen() {
                             </View>
                         ))}
 
-                        {/* No products available */}
                         {products.length === 0 && !loading && (
                             <View className="items-center py-8">
                                 <Text className="text-gray-500">No subscription options available.</Text>
@@ -118,7 +114,6 @@ export default function SubscriptionScreen() {
                     </View>
                 )}
 
-                {/* Restore Purchases Button */}
                 <TouchableOpacity
                     onPress={restore}
                     disabled={restoring}
@@ -131,13 +126,12 @@ export default function SubscriptionScreen() {
                     )}
                 </TouchableOpacity>
 
-                {/* Legal Links */}
                 <View className="mt-4 items-center gap-2">
                     <Text className="text-gray-400 text-xs text-center">
                         Payment will be charged to your {Platform.OS === 'ios' ? 'Apple ID' : 'Google Play'} account.
                     </Text>
                     <Text className="text-gray-400 text-xs text-center">
-                        Subscription auto-renews unless cancelled 24 hours before the end of the current period.
+                        New accounts include a 7-day Pro trial. Subscription auto-renews unless cancelled 24 hours before the end of the current period.
                     </Text>
                 </View>
             </ScrollView>

@@ -34,13 +34,7 @@
       "bundler": "metro"
     },
     "plugins": [
-      "react-native-iap",
-      [
-        "react-native-auth0",
-        {
-          "domain": "dev-r1tfs3j17m7ipwcs.us.auth0.com"
-        }
-      ]
+      "react-native-iap"
     ],
     "extra": {
       "eas": {

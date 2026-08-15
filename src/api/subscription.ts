@@ -1,14 +1,30 @@
 /**
  * Subscription API
- * 
- * NOTE: For native IAP, we no longer use backend for payment processing.
- * This file is kept for potential future receipt validation.
  */
 
 import request from './client';
-import { ApiResponse } from '../types';
 
-// Types for future backend receipt validation
+export interface UsageSummary {
+    aiMessagesUsed: number;
+    aiMessagesLimit: number;
+    recipeImportsUsed: number;
+    recipeImportsLimit: number;
+    recipeCount: number;
+    recipeLimit: number;
+    imageUploadsUsed: number;
+    imageUploadsLimit: number;
+}
+
+export interface SubscriptionStatus {
+    isPro: boolean;
+    isTrial: boolean;
+    trialEndsAt?: number;
+    expiresAt?: number;
+    productId?: string;
+    planName?: string;
+    usage: UsageSummary;
+}
+
 export interface ReceiptValidationRequest {
     platform: 'ios' | 'android';
     receipt: string;
@@ -21,34 +37,34 @@ export interface ReceiptValidationResponse {
     productId?: string;
 }
 
-export interface SubscriptionStatus {
-    isPro: boolean;
-    expiresAt?: number;
-    productId?: string;
+function unwrap<T>(response: { success: boolean; message?: string; data?: T }): T {
+    if (!response.success || response.data === undefined) {
+        throw new Error(response.message ?? 'Subscription request failed');
+    }
+    return response.data;
 }
 
 export const subscriptionApi = {
-    /**
-     * Validate a receipt with the backend (future enhancement)
-     * For MVP, validation is done locally in the app.
-     */
     validateReceipt: (data: ReceiptValidationRequest) =>
         request<ReceiptValidationResponse>('subscription/validate-receipt', {
             method: 'POST',
             body: JSON.stringify(data),
         }),
 
-    /**
-     * Get user's subscription status from backend
-     */
-    getStatus: () => request<SubscriptionStatus>('subscription/status'),
+    getStatus: async (): Promise<SubscriptionStatus> => {
+        const response = await request<SubscriptionStatus>('subscription/status');
+        return unwrap(response);
+    },
 
-    /**
-     * Sync purchase with backend (for tracking)
-     */
-    syncPurchase: (data: { productId: string; transactionId: string; platform: string }) =>
-        request<{ success: boolean }>('subscription/sync', {
-            method: 'POST',
-            body: JSON.stringify(data),
-        }),
+    syncPurchase: async (data: { productId: string; transactionId: string; platform: string }) => {
+        const response = await request<{ success: boolean; status: SubscriptionStatus }>(
+            'subscription/sync',
+            {
+                method: 'POST',
+                body: JSON.stringify(data),
+            },
+        );
+        const payload = unwrap(response);
+        return payload;
+    },
 };

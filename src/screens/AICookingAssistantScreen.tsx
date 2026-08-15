@@ -18,7 +18,7 @@ import {
     RefreshCwIcon,
     ShoppingCartIcon,
 } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePantry } from '../contexts/pantryContext';
 import AppHeader from '../components/AppHeader';
@@ -29,6 +29,10 @@ import { mealPlanApi } from '../api/mealPlan';
 /** Matches ChatGPT / Claude-style mobile composers: comfortable single line, grows with content. */
 const INPUT_MIN_HEIGHT = 44;
 const INPUT_MAX_HEIGHT = 140;
+
+type AICookingAssistantParams = {
+  AICookingAssistant?: { initialPrompt?: string };
+};
 
 interface ResponseCardData {
     recipeId?: string;
@@ -76,6 +80,7 @@ const SUGGESTED_PROMPTS = [
 
 export default function AICookingAssistantScreen() {
     const navigation = useNavigation();
+    const route = useRoute<RouteProp<AICookingAssistantParams, 'AICookingAssistant'>>();
     const insets = useSafeAreaInsets();
     const {
         fetchAllRecipes,
@@ -92,6 +97,13 @@ export default function AICookingAssistantScreen() {
     const [addingToMenuRecipeId, setAddingToMenuRecipeId] = useState<string | null>(null);
 
     const canSend = input.trim().length > 0 && !isTyping;
+
+    useEffect(() => {
+        const prompt = route.params?.initialPrompt;
+        if (!prompt) return;
+        setInput(prompt);
+        navigation.setParams({ initialPrompt: undefined } as never);
+    }, [route.params?.initialPrompt, navigation]);
 
     const handleInputContentSizeChange = (
         event: NativeSyntheticEvent<TextInputContentSizeChangeEventData>,

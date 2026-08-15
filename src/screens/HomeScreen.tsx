@@ -44,7 +44,13 @@ export default function HomeScreen({
     const { user, loading: authLoading } = useAuth();
 
     // Navigation handlers with fallbacks
-    const handleCookWithWhatIHave = onCookWithWhatIHave || (() => navigation.navigate('AICookingAssistant' as never));
+    const handleCookWithWhatIHave =
+        onCookWithWhatIHave ||
+        (() =>
+            navigation.navigate(
+                'AICookingAssistant' as never,
+                { initialPrompt: 'What can I cook with what I have?' } as never,
+            ));
     const handleViewCalendar = onViewCalendar || (() => navigation.navigate('CalendarTab' as never));
     const handlePantryInventory = onPantryInventory || (() => navigation.navigate('PantryTab' as never));
     const handleShoppingList = onShoppingList || (() => navigation.navigate('ShoppingTab' as never));

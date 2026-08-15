@@ -30,7 +30,6 @@ import SubscriptionScreen from './src/screens/SubscriptionScreen';
 // Contexts
 import { AuthProvider, useAuth } from './src/contexts/authContext';
 import { PantryProvider } from './src/contexts/pantryContext';
-import { Auth0Provider } from './src/contexts/auth0Context';
 
 // TODO: [EXPO GO STUB] Uncomment for production builds with native IAP
 // import iapService from './src/services/iapService';
@@ -153,22 +152,19 @@ function MainTabs() {
   );
 }
 
-// Main App - Wrapped with Auth0 and IAP Context for subscription support
 function App() {
   return (
     <SafeAreaProvider>
-      <Auth0Provider>
-        <AuthProvider>
-          <PantryProvider>
-            <NavigationContainer>
-              <StatusBar style="auto" />
-              <AuthCheck>
-                <RootNavigator />
-              </AuthCheck>
-            </NavigationContainer>
-          </PantryProvider>
-        </AuthProvider>
-      </Auth0Provider>
+      <AuthProvider>
+        <PantryProvider>
+          <NavigationContainer>
+            <StatusBar style="auto" />
+            <AuthCheck>
+              <RootNavigator />
+            </AuthCheck>
+          </NavigationContainer>
+        </PantryProvider>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }

@@ -4,6 +4,7 @@ import { usePantry } from '../contexts/pantryContext';
 import { PlusIcon, MinusIcon, CheckIcon, SearchIcon, TrashIcon, XIcon } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import AppHeader from '../components/AppHeader';
+import AskAiEmptyCta from '../components/AskAiEmptyCta';
 import { UnitSelect, QuantityLabel, preferredUnitForIngredient } from '../components/UnitSelect';
 import type { MeasurementSystem } from '../utils/units';
 
@@ -303,8 +304,19 @@ export default function ShoppingListScreen() {
                     {filteredItems.length === 0 ? (
                         <View className="p-6 items-center">
                             <Text className="text-gray-500">No items in your shopping list</Text>
-                            {searchQuery && (
+                            {searchQuery ? (
                                 <Text className="text-gray-400 text-sm mt-1">Try a different search term</Text>
+                            ) : (
+                                <AskAiEmptyCta
+                                    hint="Skip the forms — just tell the AI what you need."
+                                    label="Ask AI to build a list"
+                                    onPress={() =>
+                                        navigation.navigate(
+                                            'AICookingAssistant' as never,
+                                            { initialPrompt: 'Add milk, eggs, and bread to my shopping list' } as never,
+                                        )
+                                    }
+                                />
                             )}
                         </View>
                     ) : (

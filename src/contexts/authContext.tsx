@@ -2,7 +2,7 @@ import React, { useEffect, useState, createContext, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth } from '../api/api-auth';
 import { authHelper } from '../api/auth-helper';
-import { ApiResponse, User } from '../types';
+import { User } from '../types';
 
 export interface AuthResponse {
     success: boolean;
@@ -16,8 +16,6 @@ interface AuthContextType {
     login: (email: string, password: string) => Promise<AuthResponse>;
     logout: () => Promise<void>;
     isAuthenticated: boolean;
-    googleLogin?: (token: string) => Promise<AuthResponse>;
-    auth0Login: (idToken: string, accessToken: string) => Promise<AuthResponse>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,7 +24,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
 
-    // Check if user is already logged in on mount
     useEffect(() => {
         const checkAuth = async () => {
             try {
@@ -112,69 +109,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await AsyncStorage.removeItem('user');
     };
 
-    const googleLogin = async (token: string): Promise<AuthResponse> => {
-        setLoading(true);
-        const authResponse: AuthResponse = { success: false };
-
-        try {
-            const response = await auth.googleAuthLogin(token);
-
-            if (response && response.data && response.success) {
-                await authHelper.authenticate(response.data.token);
-                setUser(response.data.user);
-                await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
-                authResponse.success = true;
-            } else {
-                authResponse.message = response.message || 'Google login failed';
-            }
-        } catch (error) {
-            console.error('Error during Google login:', error);
-            authResponse.message = 'An error occurred during Google login';
-        } finally {
-            setLoading(false);
-        }
-
-        return authResponse;
-    };
-
-    /**
-     * Login with Auth0 tokens - syncs Auth0 user with backend
-     * Called after successful Auth0 Universal Login
-     */
-    const auth0Login = async (idToken: string, accessToken: string): Promise<AuthResponse> => {
-        setLoading(true);
-        const authResponse: AuthResponse = { success: false };
-
-        try {
-            const response = await auth.auth0Login(idToken, accessToken);
-
-            if (response && response.data && response.success) {
-                await authHelper.authenticate(response.data.token);
-                setUser(response.data.user);
-                await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
-                authResponse.success = true;
-            } else {
-                authResponse.message = response.message || 'Auth0 login failed';
-            }
-        } catch (error) {
-            console.error('Error during Auth0 login:', error);
-            authResponse.message = 'An error occurred during Auth0 login';
-        } finally {
-            setLoading(false);
-        }
-
-        return authResponse;
-    };
-
     const value = {
         user,
         loading,
         login,
         logout,
         isAuthenticated: !!user,
-        googleLogin,
         signUp,
-        auth0Login,
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

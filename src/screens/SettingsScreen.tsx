@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, TextInput } from 'react-native';
 import { useAuth } from '../contexts/authContext';
-import { useAuth0Context } from '../contexts/auth0Context';
 import { usePantry } from '../contexts/pantryContext';
 import { useNavigation } from '@react-navigation/native';
 import { UserIcon, SettingsIcon, SaveIcon, CheckIcon } from 'lucide-react-native';
@@ -10,7 +9,6 @@ import { userPreferencesApi } from '../api/userPreferences';
 
 export default function SettingsScreen() {
     const { logout, user } = useAuth();
-    const { logout: auth0Logout, isAuthenticated: isAuth0Authenticated } = useAuth0Context();
     const { userSettings, updateUserSettings } = usePantry();
     const navigation = useNavigation();
 
@@ -41,14 +39,6 @@ export default function SettingsScreen() {
     }, []);
 
     const handleLogout = async () => {
-        // Clear both local auth and Auth0 session
-        if (isAuth0Authenticated) {
-            try {
-                await auth0Logout();
-            } catch (err) {
-                console.error('Auth0 logout error:', err);
-            }
-        }
         await logout();
         navigation.reset({
             index: 0,

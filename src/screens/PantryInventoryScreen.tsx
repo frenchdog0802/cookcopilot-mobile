@@ -18,14 +18,17 @@ import { usePantry } from '../contexts/pantryContext';
 import useSearchIngredients from '../hooks/useSearchIngredient';
 import { PantryItem, IngredientEntry } from '../types';
 import AppHeader from '../components/AppHeader';
+import AskAiEmptyCta from '../components/AskAiEmptyCta';
 import { UnitSelect, QuantityLabel, preferredUnitForIngredient } from '../components/UnitSelect';
 import type { MeasurementSystem } from '../utils/units';
+import { useNavigation } from '@react-navigation/native';
 
 interface PantryInventoryProps {
     onBack?: () => void;
 }
 
 export default function PantryInventoryScreen({ onBack }: PantryInventoryProps = {}) {
+    const navigation = useNavigation();
     const {
         pantryItems: oriPantryItems,
         updatePantryItem,
@@ -241,6 +244,18 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
                         <Text className="text-gray-500 mt-2">
                             No items found
                         </Text>
+                        {!searchQuery && (
+                            <AskAiEmptyCta
+                                hint="Skip the forms — just tell the AI what you need."
+                                label="Ask AI to update pantry"
+                                onPress={() =>
+                                    navigation.navigate(
+                                        'AICookingAssistant' as never,
+                                        { initialPrompt: 'Add chicken, rice, and broccoli to my pantry' } as never,
+                                    )
+                                }
+                            />
+                        )}
                     </View>
                 ) : (
                     <FlatList

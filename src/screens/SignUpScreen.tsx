@@ -10,14 +10,13 @@ import {
     ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contexts/authContext';
 import { User } from '../types';
 
 export default function SignUpScreen() {
     const navigation = useNavigation();
-    const { signUp, loading, googleLogin } = useAuth();
+    const { signUp, loading } = useAuth();
 
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
@@ -27,7 +26,6 @@ export default function SignUpScreen() {
     const [error, setError] = useState('');
 
     const handleSubmit = async () => {
-        // Validation
         if (!firstName || !lastName || !email || !password) {
             setError('Please fill all fields');
             return;
@@ -63,14 +61,9 @@ export default function SignUpScreen() {
             } else {
                 setError(response.message || 'Sign up failed');
             }
-        } catch (err) {
+        } catch {
             setError('An error occurred. Please try again.');
         }
-    };
-
-    const handleGoogleSignUp = async () => {
-        // TODO: Implement with expo-auth-session
-        console.log('Google sign up triggered');
     };
 
     return (
@@ -86,13 +79,11 @@ export default function SignUpScreen() {
                 >
                     <View className="px-6 py-8">
                         <View className="w-full max-w-md mx-auto">
-                            {/* Header */}
                             <View className="items-center mb-8">
                                 <Text className="text-4xl font-bold text-orange-600">LarderMind</Text>
-                                <Text className="mt-2 text-base text-gray-600">Create your account</Text>
+                                <Text className="mt-2 text-base text-gray-600">Create your account with email</Text>
                             </View>
 
-                            {/* Main Card */}
                             <View className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8">
                                 {loading ? (
                                     <View className="py-10 items-center">
@@ -100,14 +91,12 @@ export default function SignUpScreen() {
                                     </View>
                                 ) : (
                                     <>
-                                        {/* Error Message */}
                                         {error ? (
                                             <View className="bg-red-50 px-4 py-3 rounded-lg mb-4">
                                                 <Text className="text-red-600 text-sm text-center">{error}</Text>
                                             </View>
                                         ) : null}
 
-                                        {/* Name Fields */}
                                         <View className="flex-row gap-3 mb-4">
                                             <View className="flex-1">
                                                 <Text className="text-sm font-medium text-gray-700 mb-1">First Name</Text>
@@ -133,7 +122,6 @@ export default function SignUpScreen() {
                                             </View>
                                         </View>
 
-                                        {/* Email */}
                                         <View className="mb-4">
                                             <Text className="text-sm font-medium text-gray-700 mb-1">Email</Text>
                                             <TextInput
@@ -145,10 +133,10 @@ export default function SignUpScreen() {
                                                 keyboardType="email-address"
                                                 autoCapitalize="none"
                                                 autoCorrect={false}
+                                                autoComplete="email"
                                             />
                                         </View>
 
-                                        {/* Password */}
                                         <View className="mb-4">
                                             <Text className="text-sm font-medium text-gray-700 mb-1">Password</Text>
                                             <TextInput
@@ -158,10 +146,10 @@ export default function SignUpScreen() {
                                                 value={password}
                                                 onChangeText={setPassword}
                                                 secureTextEntry
+                                                autoComplete="new-password"
                                             />
                                         </View>
 
-                                        {/* Confirm Password */}
                                         <View className="mb-6">
                                             <Text className="text-sm font-medium text-gray-700 mb-1">Confirm Password</Text>
                                             <TextInput
@@ -171,10 +159,10 @@ export default function SignUpScreen() {
                                                 value={confirmPassword}
                                                 onChangeText={setConfirmPassword}
                                                 secureTextEntry
+                                                autoComplete="new-password"
                                             />
                                         </View>
 
-                                        {/* Sign Up Button */}
                                         <TouchableOpacity
                                             onPress={handleSubmit}
                                             className="w-full py-4 rounded-lg bg-orange-500 mb-6"
@@ -185,29 +173,7 @@ export default function SignUpScreen() {
                                             </Text>
                                         </TouchableOpacity>
 
-                                        {/* Divider */}
-                                        <View className="relative my-4">
-                                            <View className="absolute inset-0 flex-row items-center">
-                                                <View className="flex-1 h-px bg-gray-300" />
-                                            </View>
-                                            <View className="relative flex-row justify-center">
-                                                <Text className="bg-white px-4 text-sm text-gray-500">or</Text>
-                                            </View>
-                                        </View>
-
-                                        {/* Social Buttons */}
-                                        <View className="gap-3">
-                                            <TouchableOpacity
-                                                onPress={handleGoogleSignUp}
-                                                className="w-full flex-row items-center justify-center py-3 border border-gray-300 rounded-lg bg-white"
-                                            >
-                                                <Ionicons name="logo-google" size={22} color="#DB4437" />
-                                                <Text className="ml-3 text-gray-700 font-medium">Sign up with Google</Text>
-                                            </TouchableOpacity>
-                                        </View>
-
-                                        {/* Login Link */}
-                                        <View className="mt-6 items-center">
+                                        <View className="items-center">
                                             <Text className="text-sm text-gray-600">
                                                 Already have an account?{' '}
                                                 <Text

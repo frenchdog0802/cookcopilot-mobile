@@ -1,12 +1,9 @@
 /**
- * API Auth Tests
- *
- * Tests authentication API endpoints (signin, signup, googleAuthLogin, auth0Login).
+ * API Auth Tests — email/password signin & signup
  */
 import { auth } from '../../api/api-auth';
 import { api } from '../../api/client';
 
-// Mock the API client
 jest.mock('../../api/client', () => ({
     api: {
         get: jest.fn(),
@@ -17,7 +14,6 @@ jest.mock('../../api/client', () => ({
     },
 }));
 
-// Cast to jest mock for TypeScript
 const mockedApi = api as jest.Mocked<typeof api>;
 
 beforeEach(() => {
@@ -25,9 +21,6 @@ beforeEach(() => {
 });
 
 describe('auth API', () => {
-    // ==========================================================================
-    // signin() Tests
-    // ==========================================================================
     describe('signin', () => {
         it('should POST to /auth/signin with credentials', async () => {
             mockedApi.post.mockResolvedValue({
@@ -57,9 +50,6 @@ describe('auth API', () => {
         });
     });
 
-    // ==========================================================================
-    // signup() Tests
-    // ==========================================================================
     describe('signup', () => {
         it('should POST to /auth/signup with user data and password', async () => {
             mockedApi.post.mockResolvedValue({
@@ -73,37 +63,6 @@ describe('auth API', () => {
             expect(mockedApi.post).toHaveBeenCalledWith('/auth/signup', {
                 ...userData,
                 password: 'password123',
-            });
-        });
-    });
-
-    // ==========================================================================
-    // googleAuthLogin() Tests
-    // ==========================================================================
-    describe('googleAuthLogin', () => {
-        it('should POST to /auth/google with token', async () => {
-            mockedApi.post.mockResolvedValue({ success: true, data: {} });
-
-            await auth.googleAuthLogin('google-oauth-token');
-
-            expect(mockedApi.post).toHaveBeenCalledWith('/auth/google', {
-                token: 'google-oauth-token',
-            });
-        });
-    });
-
-    // ==========================================================================
-    // auth0Login() Tests
-    // ==========================================================================
-    describe('auth0Login', () => {
-        it('should POST to /auth/auth0 with tokens', async () => {
-            mockedApi.post.mockResolvedValue({ success: true, data: {} });
-
-            await auth.auth0Login('id-token', 'access-token');
-
-            expect(mockedApi.post).toHaveBeenCalledWith('/auth/auth0', {
-                idToken: 'id-token',
-                accessToken: 'access-token',
             });
         });
     });
