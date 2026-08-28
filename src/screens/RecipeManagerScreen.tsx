@@ -8,16 +8,16 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
-    FlatList,
     TouchableOpacity,
     TextInput,
     ScrollView,
-    Image,
     Modal,
     ActivityIndicator,
     Alert,
     RefreshControl,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
+import { useTranslation } from 'react-i18next';
 import {
     PlusIcon,
     TrashIcon,
@@ -27,9 +27,7 @@ import {
     FolderIcon,
     ChevronRightIcon,
     HomeIcon,
-    MoreVerticalIcon,
     FolderPlusIcon,
-    PencilIcon,
     AlertCircleIcon,
     CameraIcon,
     ImageIcon,
@@ -46,12 +44,27 @@ import { recipeApi } from '../api/recipe';
 import { folderApi } from '../api/folder';
 import { Recipe, Folder, ApiResponse } from '../types';
 import { normalizeRecipe, usePantry } from '../contexts/pantryContext';
+import { CachedImage } from '../components/ui/CachedImage';
+import { SkeletonList } from '../components/ui/Skeleton';
+import { FolderRow, RecipeRow } from '../components/recipes/RecipeListRows';
 import { colors } from '../theme/tokens';
 
 function unwrapListResponse<T>(data: T[] | Record<string, T[] | undefined>, key: string): T[] {
     if (Array.isArray(data)) return data;
     const list = data[key];
     return Array.isArray(list) ? list : [];
+}
+
+function unwrapEntityResponse<T>(
+    data: T | Record<string, T | undefined> | undefined,
+    key: string,
+): T | null {
+    if (!data || typeof data !== 'object') return null;
+    if ('id' in data && (data as { id?: unknown }).id != null) {
+        return data as T;
+    }
+    const nested = (data as Record<string, T | undefined>)[key];
+    return nested ?? null;
 }
 
 function serializeRecipePayload(recipe: Partial<Recipe>): Record<string, unknown> {
@@ -81,6 +94,7 @@ interface Ingredient {
 const DEFAULT_FOLDER_NAMES = ['Uncategorized', 'Favorites', 'Breakfast', 'Lunch', 'Dinner'];
 
 export default function RecipeManagerScreen() {
+    const { t } = useTranslation();
     const navigation = useNavigation();
     const route = useRoute();
     const recipeIdParam = (route.params as { recipeId?: string } | undefined)?.recipeId;
@@ -142,7 +156,12 @@ export default function RecipeManagerScreen() {
         try {
             const response = await folderApi.list();
             if (response.success && response.data) {
-                setFolders(response.data);
+                setFolders(
+                    unwrapListResponse(
+                        response.data as Folder[] | { folders?: Folder[] },
+                        'folders',
+                    ),
+                );
             } else {
                 console.error('[RecipeManager] Failed to fetch folders:', response.message);
             }
@@ -250,8 +269,12 @@ export default function RecipeManagerScreen() {
                 icon: 'FolderIcon',
             });
 
-            if (response.success && response.data) {
-                setFolders([...folders, response.data]);
+            const createdFolder = unwrapEntityResponse<Folder>(
+                response.data as Folder | { folder?: Folder },
+                'folder',
+            );
+            if (response.success && createdFolder) {
+                setFolders((prev) => [...prev, createdFolder]);
                 setNewFolderName('');
                 setShowAddFolder(false);
             } else {
@@ -277,8 +300,14 @@ export default function RecipeManagerScreen() {
                 name: newFolderName.trim(),
             });
 
-            if (response.success && response.data) {
-                setFolders(folders.map((f) => (f.id === editingFolder.id ? response.data! : f)));
+            const updatedFolder = unwrapEntityResponse<Folder>(
+                response.data as Folder | { folder?: Folder },
+                'folder',
+            );
+            if (response.success && updatedFolder) {
+                setFolders((prev) =>
+                    prev.map((f) => (f.id === editingFolder.id ? updatedFolder : f)),
+                );
                 setEditingFolder(null);
                 setNewFolderName('');
             } else {
@@ -588,108 +617,48 @@ export default function RecipeManagerScreen() {
     /**
      * Render folder card
      */
-    const renderFolderCard = ({ item: folder }: { item: Folder }) => (
-        <TouchableOpacity
-            onPress={() => setCurrentFolder(folder)}
-            className="bg-surface rounded-xl p-4 mb-3 border border-line"
-        >
-            <View className="flex-row items-center justify-between">
-                <View className="flex-row items-center flex-1">
-                    <FolderIcon size={20} color={colors.herb} />
-                    <Text className="font-medium text-ink ml-2">{folder.name}</Text>
-                </View>
-                <View className="flex-row items-center">
-                    <Text className="text-muted text-sm mr-2">
-                        {recipes.filter((r) => r.folder_id === folder.id).length} recipes
-                    </Text>
-                    <TouchableOpacity
-                        onPress={() => setShowFolderActions(showFolderActions === folder.id ? null : folder.id)}
-                        className="p-1"
-                    >
-                        <MoreVerticalIcon size={18} color={colors.muted} />
-                    </TouchableOpacity>
-                </View>
-            </View>
-
-            {/* Folder Actions Dropdown */}
-            {showFolderActions === folder.id && (
-                <View className="absolute right-2 top-12 bg-surface rounded-lg border border-line z-10 w-36">
-                    <TouchableOpacity
-                        onPress={() => {
-                            setEditingFolder(folder);
-                            setNewFolderName(folder.name);
-                            setShowFolderActions(null);
-                        }}
-                        className="flex-row items-center p-3 border-b border-line"
-                    >
-                        <PencilIcon size={14} color={colors.ink} />
-                        <Text className="text-ink ml-2">Rename</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        onPress={() => {
-                            setNewRecipe({ ...newRecipe, folder_id: folder.id });
-                            setShowAddRecipe(true);
-                            setShowFolderActions(null);
-                        }}
-                        className="flex-row items-center p-3 border-b border-line"
-                    >
-                        <PlusIcon size={14} color={colors.ink} />
-                        <Text className="text-ink ml-2">Add Recipe</Text>
-                    </TouchableOpacity>
-                    {folder.name.toLowerCase() !== 'uncategorized' && (
-                        <TouchableOpacity
-                            onPress={() => {
-                                setFolderToDelete(folder);
-                                setShowDeleteConfirm(true);
-                                setShowFolderActions(null);
-                            }}
-                            className="flex-row items-center p-3"
-                        >
-                            <TrashIcon size={14} color={colors.danger} />
-                            <Text className="ml-2" style={{ color: colors.danger }}>Delete</Text>
-                        </TouchableOpacity>
-                    )}
-                </View>
-            )}
-        </TouchableOpacity>
-    );
+    const renderFolderCard = useCallback(({ item: folder }: { item: Folder }) => (
+        <FolderRow
+            folder={folder}
+            recipeCount={recipes.filter((r) => r.folder_id === folder.id).length}
+            showActions={showFolderActions === folder.id}
+            onOpen={setCurrentFolder}
+            onToggleActions={setShowFolderActions}
+            onRename={(f) => {
+                setEditingFolder(f);
+                setNewFolderName(f.name);
+                setShowFolderActions(null);
+            }}
+            onAddRecipe={(f) => {
+                setNewRecipe({ ...newRecipe, folder_id: f.id });
+                setShowAddRecipe(true);
+                setShowFolderActions(null);
+            }}
+            onDelete={(f) => {
+                setFolderToDelete(f);
+                setShowDeleteConfirm(true);
+                setShowFolderActions(null);
+            }}
+        />
+    ), [recipes, showFolderActions, newRecipe]);
 
     /**
      * Render recipe card
      */
-    const renderRecipeCard = ({ item: recipe }: { item: Recipe }) => (
-        <TouchableOpacity
-            onPress={() => {
-                setSelectedRecipe(recipe);
+    const renderRecipeCard = useCallback(({ item: recipe }: { item: Recipe }) => (
+        <RecipeRow
+            recipe={recipe}
+            onOpen={(r) => {
+                setSelectedRecipe(r);
                 setIsEditing(false);
             }}
-            className="bg-surface rounded-xl p-4 mb-3 border border-line"
-        >
-            <View className="flex-row justify-between items-start">
-                <View className="flex-1">
-                    <Text className="font-medium text-ink text-lg">{recipe.meal_name}</Text>
-                    <Text className="text-muted text-sm mt-1">
-                        {recipe.ingredients?.length || 0} ingredient
-                        {(recipe.ingredients?.length || 0) !== 1 ? 's' : ''}
-                    </Text>
-                </View>
-                <View className="flex-row">
-                    <TouchableOpacity
-                        onPress={() => {
-                            setSelectedRecipe(recipe);
-                            setIsEditing(true);
-                        }}
-                        className="p-2"
-                    >
-                        <EditIcon size={18} color={colors.herb} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleDeleteRecipe(recipe.id)} className="p-2">
-                        <TrashIcon size={18} color={colors.danger} />
-                    </TouchableOpacity>
-                </View>
-            </View>
-        </TouchableOpacity>
-    );
+            onEdit={(r) => {
+                setSelectedRecipe(r);
+                setIsEditing(true);
+            }}
+            onDelete={handleDeleteRecipe}
+        />
+    ), [handleDeleteRecipe]);
 
     /**
      * Ingredient row component for forms
@@ -773,10 +742,9 @@ export default function RecipeManagerScreen() {
     if (loading) {
         return (
             <View className="flex-1 bg-linen">
-                <AppHeader title="Recipe Manager" showBackButton onBack={handleNavigateBack} />
-                <View className="flex-1 items-center justify-center">
-                    <ActivityIndicator size="large" color={colors.herb} />
-                    <Text className="text-muted mt-4">Loading recipes...</Text>
+                <AppHeader title={t('recipes.title')} showBackButton onBack={handleNavigateBack} />
+                <View className="flex-1 p-4">
+                    <SkeletonList count={6} />
                 </View>
             </View>
         );
@@ -788,7 +756,7 @@ export default function RecipeManagerScreen() {
     if (error) {
         return (
             <View className="flex-1 bg-linen">
-                <AppHeader title="Recipe Manager" showBackButton onBack={handleNavigateBack} />
+                <AppHeader title={t('recipes.title')} showBackButton onBack={handleNavigateBack} />
                 <View className="flex-1 items-center justify-center p-6">
                     <AlertCircleIcon size={48} color={colors.danger} />
                     <Text className="text-ink text-lg mt-4 text-center">{error}</Text>
@@ -808,61 +776,59 @@ export default function RecipeManagerScreen() {
     // ========================================================================
     return (
         <View className="flex-1 bg-linen">
-            <AppHeader title="Recipe Manager" showBackButton onBack={handleNavigateBack} />
+            <AppHeader title={t('recipes.title')} showBackButton onBack={handleNavigateBack} />
 
-            <ScrollView
-                className="flex-1 p-4"
-                refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.herb} colors={[colors.herb]} />
-                }
-            >
-                {/* Breadcrumb */}
-                <View className="flex-row items-center mb-4">
-                    {currentFolder && (
-                        <TouchableOpacity
-                            onPress={() => setCurrentFolder(null)}
-                            className="mr-2 p-1"
-                            accessibilityLabel="Back to categories"
-                        >
-                            <ChevronRightIcon
-                                size={18}
-                                color={colors.muted}
-                                style={{ transform: [{ rotate: '180deg' }] }}
-                            />
+            {!showAddRecipe && !selectedRecipe ? (
+                <View className="flex-1 p-4">
+                    <View className="flex-row items-center mb-4">
+                        {currentFolder && (
+                            <TouchableOpacity
+                                onPress={() => setCurrentFolder(null)}
+                                className="mr-2 p-1"
+                                accessibilityLabel="Back to categories"
+                            >
+                                <ChevronRightIcon
+                                    size={18}
+                                    color={colors.muted}
+                                    style={{ transform: [{ rotate: '180deg' }] }}
+                                />
+                            </TouchableOpacity>
+                        )}
+                        <TouchableOpacity onPress={() => setCurrentFolder(null)} className="flex-row items-center">
+                            <HomeIcon size={16} color={colors.muted} />
+                            <Text className="text-muted ml-1">Categories</Text>
                         </TouchableOpacity>
-                    )}
-                    <TouchableOpacity onPress={() => setCurrentFolder(null)} className="flex-row items-center">
-                        <HomeIcon size={16} color={colors.muted} />
-                        <Text className="text-muted ml-1">Categories</Text>
-                    </TouchableOpacity>
-                    {currentFolder && (
-                        <>
-                            <ChevronRightIcon size={16} color={colors.muted} />
-                            <Text className="text-ink font-medium ml-1">{currentFolder.name}</Text>
-                        </>
-                    )}
-                </View>
+                        {currentFolder && (
+                            <>
+                                <ChevronRightIcon size={16} color={colors.muted} />
+                                <Text className="text-ink font-medium ml-1">{currentFolder.name}</Text>
+                            </>
+                        )}
+                    </View>
 
-                {/* Main Content */}
-                {!showAddRecipe && !selectedRecipe ? (
-                    !currentFolder ? (
-                        // Folder View
-                        <View>
-                            <View className="flex-row justify-between items-center mb-4">
-                                <Text className="text-xl font-bold text-ink">Recipe Categories</Text>
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        setNewFolderName('');
-                                        setShowAddFolder(true);
-                                    }}
-                                    className="flex-row items-center bg-sage px-3 py-2 rounded-lg border border-line"
-                                >
-                                    <FolderPlusIcon size={16} color={colors.danger} />
-                                    <Text className="text-herb-deep ml-1 font-medium">New</Text>
-                                </TouchableOpacity>
-                            </View>
-
-                            {folders.length === 0 ? (
+                    {!currentFolder ? (
+                        <FlashList
+                            data={folders}
+                            renderItem={renderFolderCard}
+                            keyExtractor={(item) => item.id}
+                            refreshing={refreshing}
+                            onRefresh={handleRefresh}
+                            ListHeaderComponent={
+                                <View className="flex-row justify-between items-center mb-4">
+                                    <Text className="text-xl font-bold text-ink">Recipe Categories</Text>
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setNewFolderName('');
+                                            setShowAddFolder(true);
+                                        }}
+                                        className="flex-row items-center bg-sage px-3 py-2 rounded-lg border border-line"
+                                    >
+                                        <FolderPlusIcon size={16} color={colors.danger} />
+                                        <Text className="text-herb-deep ml-1 font-medium">New</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            }
+                            ListEmptyComponent={
                                 <View className="bg-surface rounded-xl p-6 items-center border border-line">
                                     <FolderIcon size={48} color={colors.line} />
                                     <Text className="text-muted mt-4">No categories yet</Text>
@@ -870,50 +836,46 @@ export default function RecipeManagerScreen() {
                                         Create a category to organize your recipes
                                     </Text>
                                 </View>
-                            ) : (
-                                <FlatList
-                                    data={folders}
-                                    renderItem={renderFolderCard}
-                                    keyExtractor={(item) => item.id}
-                                    scrollEnabled={false}
-                                />
-                            )}
-                        </View>
+                            }
+                        />
                     ) : (
-                        // Recipe List View
-                        <View>
-                            {/* Search */}
-                            <View className="relative mb-4">
-                                <View className="absolute left-3 top-3 z-10">
-                                    <SearchIcon size={18} color={colors.muted} />
+                        <FlashList
+                            data={filteredRecipes}
+                            renderItem={renderRecipeCard}
+                            keyExtractor={(item) => item.id}
+                            refreshing={refreshing}
+                            onRefresh={handleRefresh}
+                            ListHeaderComponent={
+                                <View>
+                                    <View className="relative mb-4">
+                                        <View className="absolute left-3 top-3 z-10">
+                                            <SearchIcon size={18} color={colors.muted} />
+                                        </View>
+                                        <TextInput
+                                            placeholder="Search recipes..."
+                                            value={searchQuery}
+                                            onChangeText={setSearchQuery}
+                                            className="w-full pl-10 pr-4 py-3 bg-surface rounded-xl border border-line text-ink"
+                                        />
+                                    </View>
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setNewRecipe({ ...newRecipe, folder_id: currentFolder.id });
+                                            setShowAddRecipe(true);
+                                        }}
+                                        className="flex-row items-center justify-center bg-surface border border-line py-3 rounded-xl mb-4"
+                                    >
+                                        <PlusIcon size={18} color={colors.ink} />
+                                        <Text className="text-ink font-medium ml-2">Add New Recipe</Text>
+                                    </TouchableOpacity>
                                 </View>
-                                <TextInput
-                                    placeholder="Search recipes..."
-                                    value={searchQuery}
-                                    onChangeText={setSearchQuery}
-                                    className="w-full pl-10 pr-4 py-3 bg-surface rounded-xl border border-line text-ink"
-                                />
-                            </View>
-
-                            {/* Add Recipe Button */}
-                            <TouchableOpacity
-                                onPress={() => {
-                                    setNewRecipe({ ...newRecipe, folder_id: currentFolder.id });
-                                    setShowAddRecipe(true);
-                                }}
-                                className="flex-row items-center justify-center bg-surface border border-line py-3 rounded-xl mb-4"
-                            >
-                                <PlusIcon size={18} color={colors.ink} />
-                                <Text className="text-ink font-medium ml-2">Add New Recipe</Text>
-                            </TouchableOpacity>
-
-                            {/* Recipes List */}
-                            {filteredRecipes.length === 0 ? (
+                            }
+                            ListEmptyComponent={
                                 <View className="bg-surface rounded-xl p-6 items-center border border-line">
                                     <Text className="text-muted">No recipes found</Text>
                                     {!searchQuery && (
                                         <AskAiEmptyCta
-                                            hint="Skip the forms — just tell the AI what you need."
+                                            hint="Skip the forms ??just tell the AI what you need."
                                             label="Ask AI to import a recipe"
                                             onPress={() =>
                                                 navigation.navigate(
@@ -924,18 +886,18 @@ export default function RecipeManagerScreen() {
                                         />
                                     )}
                                 </View>
-                            ) : (
-                                <FlatList
-                                    data={filteredRecipes}
-                                    renderItem={renderRecipeCard}
-                                    keyExtractor={(item) => item.id}
-                                    scrollEnabled={false}
-                                />
-                            )}
-                        </View>
-                    )
-                ) : selectedRecipe ? (
-                    // Recipe Detail/Edit View
+                            }
+                        />
+                    )}
+                </View>
+            ) : (
+            <ScrollView
+                className="flex-1 p-4"
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.herb} colors={[colors.herb]} />
+                }
+            >
+                {selectedRecipe ? (
                     <View className="bg-surface rounded-xl overflow-hidden border border-line">
                         <View className="p-4 border-b border-line bg-linen flex-row justify-between items-center">
                             <Text className="font-semibold text-ink">
@@ -1028,9 +990,10 @@ export default function RecipeManagerScreen() {
                                     </Text>
 
                                     {selectedRecipe.image?.url ? (
-                                        <Image
-                                            source={{ uri: selectedRecipe.image.url }}
+                                        <CachedImage
+                                            uri={selectedRecipe.image.url}
                                             className="w-full h-40 rounded-xl mb-4"
+                                            style={{ width: '100%', height: 160, borderRadius: 12 }}
                                         />
                                     ) : null}
 
@@ -1109,10 +1072,11 @@ export default function RecipeManagerScreen() {
                             <Text className="text-ink mb-2">Recipe Image</Text>
                             {newRecipe.image?.url ? (
                                 <View className="relative mb-4">
-                                    <Image
-                                        source={{ uri: newRecipe.image.url }}
+                                    <CachedImage
+                                        uri={newRecipe.image.url}
                                         className="w-full h-48 rounded-xl"
-                                        resizeMode="cover"
+                                        style={{ width: '100%', height: 192, borderRadius: 12 }}
+                                        contentFit="cover"
                                     />
                                     <TouchableOpacity
                                         onPress={removeImage}
@@ -1195,6 +1159,7 @@ export default function RecipeManagerScreen() {
                     </View>
                 )}
             </ScrollView>
+            )}
 
             {/* Add Folder Modal */}
             <Modal visible={showAddFolder} transparent animationType="fade">

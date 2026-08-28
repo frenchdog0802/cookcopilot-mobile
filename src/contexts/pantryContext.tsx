@@ -2,6 +2,7 @@ import React, { useState, createContext, useContext, useCallback, useEffect } fr
 import {
     PantryItem,
     ShoppingListItem,
+    ShoppingListSyncStatus,
     Recipe,
     Folder,
     UserSettings,
@@ -13,15 +14,43 @@ import {
 import { folderApi } from '../api/folder';
 import { ingredientApi } from '../api/ingredient';
 import { recipeApi } from '../api/recipe';
-import { pantryItemApi } from '../api/pantryItem';
-import { shoppingListApi } from '../api/shoppingList';
+import { pantryItemApi, parsePantryItem, parsePantryItems } from '../api/pantryItem';
+import { shoppingListApi, parseShoppingListItems } from '../api/shoppingList';
 import { mealPlanApi } from '../api/mealPlan';
 import { userPreferencesApi } from '../api/userPreferences';
+import { useAuth } from './authContext';
+import {
+    DEFAULT_SYNC_STATUS,
+    createLocalItemId,
+    enqueueCreate,
+    enqueueDelete,
+    enqueueUpdate,
+    flushShoppingListQueue,
+    getIsOnline,
+    loadQueue,
+    loadSnapshot,
+    mergeNames,
+    saveQueue,
+    saveSnapshot,
+    subscribeConnectivity,
+} from '../services/shoppingListOffline';
 
 function unwrapListResponse<T>(data: T[] | Record<string, T[] | undefined>, key: string): T[] {
     if (Array.isArray(data)) return data;
     const list = data[key];
     return Array.isArray(list) ? list : [];
+}
+
+function unwrapEntityResponse<T>(
+    data: T | Record<string, T | undefined> | undefined,
+    key: string,
+): T | null {
+    if (!data || typeof data !== 'object') return null;
+    if ('id' in data && (data as { id?: unknown }).id != null) {
+        return data as T;
+    }
+    const nested = (data as Record<string, T | undefined>)[key];
+    return nested ?? null;
 }
 
 function normalizeInstructions(raw: unknown, stepsFallback?: unknown): string[] {
@@ -125,10 +154,12 @@ interface PantryContextType {
 
     // Shopping list
     shoppingList: ShoppingListItem[];
+    shoppingListSyncStatus: ShoppingListSyncStatus;
     fetchAllShoppingListItems: () => Promise<ShoppingListItem[]>;
     updateShoppingListItem: (item: ShoppingListItem) => Promise<ApiResponse<ShoppingListItem>>;
     addShoppingListItem: (item: Partial<ShoppingListItem>) => Promise<ApiResponse<ShoppingListItem>>;
     removeShoppingListItem: (id: string) => Promise<void>;
+    retryShoppingListSync: () => Promise<void>;
 
     // Meal plans
     mealPlan: MealPlan[];
@@ -151,18 +182,81 @@ const DEFAULT_FOLDERS: Folder[] = [
 ];
 
 export function PantryProvider({ children }: { children: React.ReactNode }) {
+    const { user } = useAuth();
+    const userId = user?.id ?? '';
     const [loading, setLoading] = useState(false);
     const [mealPlan, setMealPlan] = useState<MealPlan[]>([]);
     const [ingredients, setIngredients] = useState<IngredientEntry[]>([]);
     const [folders, setFolders] = useState<Folder[]>(DEFAULT_FOLDERS);
     const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
     const [shoppingList, setShoppingList] = useState<ShoppingListItem[]>([]);
+    const [shoppingListSyncStatus, setShoppingListSyncStatus] =
+        useState<ShoppingListSyncStatus>(DEFAULT_SYNC_STATUS);
     const [recipes, setRecipes] = useState<Recipe[]>([]);
     const [userSettings, setUserSettings] = useState<UserSettings>({
         name: '',
         language: 'english',
         measurement_unit: 'metric',
     });
+
+    const updateSyncStatus = useCallback((patch: Partial<ShoppingListSyncStatus>) => {
+        setShoppingListSyncStatus((prev) => ({ ...prev, ...patch }));
+    }, []);
+
+    const runFlush = useCallback(async () => {
+        if (!userId) return;
+        updateSyncStatus({ isSyncing: true });
+        const result = await flushShoppingListQueue(userId, {
+            onItems: (items) => setShoppingList(items),
+            onQueue: (mutations) => updateSyncStatus({ pendingCount: mutations.length }),
+        });
+        updateSyncStatus({
+            isSyncing: false,
+            pendingCount: result.remaining,
+            lastSyncError: result.ok ? null : (result.error ?? 'Sync failed'),
+            ...(result.ok && result.remaining === 0 ? { lastSyncedAt: Date.now() } : {}),
+        });
+        if (result.items) {
+            setShoppingList(result.items);
+        }
+    }, [userId, updateSyncStatus]);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            const online = await getIsOnline();
+            if (!cancelled) updateSyncStatus({ isOnline: online });
+        })();
+        const unsubscribe = subscribeConnectivity((online) => {
+            updateSyncStatus({ isOnline: online });
+            if (online && userId) {
+                void runFlush();
+            }
+        });
+        return () => {
+            cancelled = true;
+            unsubscribe();
+        };
+    }, [userId, updateSyncStatus, runFlush]);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            if (!userId) {
+                setShoppingList([]);
+                setShoppingListSyncStatus(DEFAULT_SYNC_STATUS);
+                return;
+            }
+            const cached = await loadSnapshot(userId);
+            const queue = await loadQueue(userId);
+            if (cancelled) return;
+            setShoppingList(cached);
+            updateSyncStatus({ pendingCount: queue.length });
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [userId, updateSyncStatus]);
 
     useEffect(() => {
         let cancelled = false;
@@ -190,7 +284,11 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
         try {
             const response = await folderApi.list();
             if (response.success && response.data) {
-                setFolders(response.data.length > 0 ? response.data : DEFAULT_FOLDERS);
+                const fetchedFolders = unwrapListResponse(
+                    response.data as Folder[] | { folders?: Folder[] },
+                    'folders',
+                );
+                setFolders(fetchedFolders.length > 0 ? fetchedFolders : DEFAULT_FOLDERS);
             }
         } catch (error) {
             console.error('Failed to fetch folders:', error);
@@ -201,10 +299,14 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
 
     const addFolder = useCallback(async (folder: Partial<Folder>): Promise<ApiResponse<Folder>> => {
         const response = await folderApi.create(folder);
-        if (response.success && response.data) {
-            setFolders((prev) => [...prev, response.data!]);
+        const createdFolder = unwrapEntityResponse<Folder>(
+            response.data as Folder | { folder?: Folder },
+            'folder',
+        );
+        if (response.success && createdFolder) {
+            setFolders((prev) => [...prev, createdFolder]);
         }
-        return response;
+        return createdFolder ? { ...response, data: createdFolder } : response;
     }, []);
 
     const deleteFolder = useCallback(async (id: string) => {
@@ -220,8 +322,12 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
 
     const updateFolder = useCallback(async (folder: Folder) => {
         const response = await folderApi.update(folder.id, folder);
-        if (response.success && response.data) {
-            setFolders((prev) => prev.map((f) => (f.id === folder.id ? response.data! : f)));
+        const updatedFolder = unwrapEntityResponse<Folder>(
+            response.data as Folder | { folder?: Folder },
+            'folder',
+        );
+        if (response.success && updatedFolder) {
+            setFolders((prev) => prev.map((f) => (f.id === folder.id ? updatedFolder : f)));
         }
     }, []);
 
@@ -286,7 +392,9 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
         try {
             const response = await pantryItemApi.list();
             if (response.success && response.data) {
-                setPantryItems(response.data);
+                setPantryItems(parsePantryItems(response.data));
+            } else if (response.success) {
+                setPantryItems([]);
             }
         } catch (error) {
             console.error('Failed to fetch pantry items:', error);
@@ -297,27 +405,34 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
 
     const addPantryItem = useCallback(async (item: Partial<PantryItem>): Promise<ApiResponse<PantryItem>> => {
         const response = await pantryItemApi.create(item);
-        if (response.success && response.data) {
-            setPantryItems((prev) => [...prev, response.data!]);
+        const created = response.success ? parsePantryItem(response.data) : null;
+        if (response.success && created) {
+            setPantryItems((prev) => [...prev, created]);
         }
-        return response;
+        return { ...response, data: created ?? undefined };
     }, []);
 
     const updatePantryItem = useCallback(async (item: PantryItem) => {
+        const previous = pantryItems.find((i) => i.id === item.id);
         // Optimistically update the local state first
         setPantryItems((prev) => prev.map((i) => (i.id === item.id ? item : i)));
 
         const response = await pantryItemApi.update(item.id, item);
-        if (response.success && response.data) {
-            // Merge response with the original item to preserve any missing fields
-            setPantryItems((prev) => prev.map((i) => (i.id === item.id ? { ...item, ...response.data! } : i)));
+        const updated = response.success ? parsePantryItem(response.data) : null;
+        if (response.success && updated) {
+            setPantryItems((prev) => prev.map((i) => (i.id === item.id ? { ...item, ...updated } : i)));
+            return;
         }
-    }, []);
+        // Rollback on hard failure
+        if (previous) {
+            setPantryItems((prev) => prev.map((i) => (i.id === item.id ? previous : i)));
+        }
+    }, [pantryItems]);
 
     const updatePantryItems = useCallback(async (items: PantryItem[]) => {
         const response = await pantryItemApi.updateMany(items);
         if (response.success && response.data) {
-            setPantryItems(response.data);
+            setPantryItems(parsePantryItems(response.data));
         }
     }, []);
 
@@ -342,47 +457,127 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
 
     // === SHOPPING LIST FUNCTIONS ===
     const fetchAllShoppingListItems = useCallback(async (): Promise<ShoppingListItem[]> => {
+        if (!userId) {
+            return shoppingList;
+        }
+
+        const cached = await loadSnapshot(userId);
+        setShoppingList(cached);
+
+        const online = await getIsOnline();
+        updateSyncStatus({ isOnline: online });
+        if (!online) {
+            const queue = await loadQueue(userId);
+            updateSyncStatus({ pendingCount: queue.length });
+            return cached;
+        }
+
         setLoading(true);
         try {
             const response = await shoppingListApi.list();
-            if (response.success && response.data) {
-                setShoppingList(response.data);
-                return response.data;
+            if (response.success && response.data !== undefined) {
+                const serverItems = parseShoppingListItems(response.data);
+                const merged = mergeNames(cached, serverItems);
+                setShoppingList(merged);
+                await saveSnapshot(userId, merged);
+                const queue = await loadQueue(userId);
+                updateSyncStatus({
+                    pendingCount: queue.length,
+                    lastSyncError: null,
+                    lastSyncedAt: Date.now(),
+                });
+                if (queue.length > 0) {
+                    void runFlush();
+                }
+                return merged;
             }
+            if (response.success) {
+                setShoppingList([]);
+                await saveSnapshot(userId, []);
+                return [];
+            }
+            // Keep cache on soft failure
+            return cached.length > 0 ? cached : shoppingList;
         } catch (error) {
             console.error('Failed to fetch shopping list:', error);
+            return cached.length > 0 ? cached : shoppingList;
         } finally {
             setLoading(false);
         }
-        return shoppingList;
-    }, [shoppingList]);
+    }, [userId, shoppingList, updateSyncStatus, runFlush]);
 
     const updateShoppingListItem = useCallback(async (item: ShoppingListItem): Promise<ApiResponse<ShoppingListItem>> => {
-        // Optimistically update the local state first
-        setShoppingList((prev) => prev.map((i) => (i.id === item.id ? item : i)));
-
-        const response = await shoppingListApi.update(item.id, item);
-        if (response.success && response.data) {
-            // Merge response with the original item to preserve any missing fields
-            setShoppingList((prev) => prev.map((i) => (i.id === item.id ? { ...item, ...response.data! } : i)));
+        const next = shoppingList.map((i) => (i.id === item.id ? item : i));
+        setShoppingList(next);
+        if (userId) {
+            await saveSnapshot(userId, next);
+            const queue = enqueueUpdate(await loadQueue(userId), item.id, {
+                name: item.name,
+                quantity: item.quantity,
+                unit: item.unit,
+                checked: item.checked,
+            });
+            await saveQueue(userId, queue);
+            updateSyncStatus({ pendingCount: queue.length, lastSyncError: null });
+            if (shoppingListSyncStatus.isOnline) {
+                void runFlush();
+            }
         }
-        return response;
-    }, []);
+        return { success: true, data: item };
+    }, [userId, shoppingList, shoppingListSyncStatus.isOnline, updateSyncStatus, runFlush]);
 
     const addShoppingListItem = useCallback(async (item: Partial<ShoppingListItem>): Promise<ApiResponse<ShoppingListItem>> => {
-        const response = await shoppingListApi.create({ ...item, checked: false });
-        if (response.success && response.data) {
-            setShoppingList((prev) => [response.data!, ...prev]);
+        const localItem: ShoppingListItem = {
+            id: createLocalItemId(),
+            name: String(item.name ?? '').trim(),
+            quantity: Number(item.quantity ?? 1),
+            unit: String(item.unit ?? ''),
+            checked: false,
+            ingredient_id: item.ingredient_id,
+            unit_kind: item.unit_kind,
+            base_unit: item.base_unit,
+            default_display_unit: item.default_display_unit,
+        };
+        if (!localItem.name) {
+            return { success: false, message: 'Item name is required' };
         }
-        return response;
-    }, []);
+
+        const next = [localItem, ...shoppingList];
+        setShoppingList(next);
+        if (userId) {
+            await saveSnapshot(userId, next);
+            const queue = enqueueCreate(await loadQueue(userId), localItem.id, {
+                name: localItem.name,
+                quantity: localItem.quantity,
+                unit: localItem.unit,
+                checked: false,
+            });
+            await saveQueue(userId, queue);
+            updateSyncStatus({ pendingCount: queue.length, lastSyncError: null });
+            if (shoppingListSyncStatus.isOnline) {
+                void runFlush();
+            }
+        }
+        return { success: true, data: localItem };
+    }, [userId, shoppingList, shoppingListSyncStatus.isOnline, updateSyncStatus, runFlush]);
 
     const removeShoppingListItem = useCallback(async (id: string) => {
-        const response = await shoppingListApi.delete(id);
-        if (response.success) {
-            setShoppingList((prev) => prev.filter((i) => i.id !== id));
+        const next = shoppingList.filter((i) => i.id !== id);
+        setShoppingList(next);
+        if (userId) {
+            await saveSnapshot(userId, next);
+            const queue = enqueueDelete(await loadQueue(userId), id);
+            await saveQueue(userId, queue);
+            updateSyncStatus({ pendingCount: queue.length, lastSyncError: null });
+            if (shoppingListSyncStatus.isOnline) {
+                void runFlush();
+            }
         }
-    }, []);
+    }, [userId, shoppingList, shoppingListSyncStatus.isOnline, updateSyncStatus, runFlush]);
+
+    const retryShoppingListSync = useCallback(async () => {
+        await runFlush();
+    }, [runFlush]);
 
     // === MEAL PLAN FUNCTIONS ===
     const fetchAllMealPlans = useCallback(async (): Promise<MealPlan[]> => {
@@ -466,6 +661,7 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
         recipes,
         pantryItems,
         shoppingList,
+        shoppingListSyncStatus,
         folders,
         ingredients,
         mealPlan,
@@ -489,6 +685,7 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
         updateShoppingListItem,
         addShoppingListItem,
         removeShoppingListItem,
+        retryShoppingListSync,
         fetchAllMealPlans,
         addMealPlan,
         updateMealPlan,
