@@ -4,8 +4,6 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
-  ImageBackground,
 } from 'react-native';
 import {
   ChefHat as ChefHatIcon,
@@ -15,12 +13,19 @@ import {
   Settings,
   Calendar as CalendarIcon,
 } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { usePantry } from '../contexts/pantryContext';
 import { useAuth } from '../contexts/authContext';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ListRow, PrimaryButton } from '../components/ui';
+import { ListRow, PrimaryButton, CachedImage, SkeletonHero } from '../components/ui';
+import { constrainUnsplashUrl } from '../utils/imageUrl';
 import { colors } from '../theme/tokens';
+
+const HERO_IMAGE_URL = constrainUnsplashUrl(
+  'https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=1600&q=80',
+  800,
+);
 
 interface HomeProps {
   onCookWithWhatIHave?: () => void;
@@ -40,6 +45,7 @@ export default function HomeScreen({
   onRecipeManager,
   onSettings,
 }: HomeProps = {}) {
+  const { t } = useTranslation();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { shoppingList, pantryItems, fetchAllPantryItems, fetchAllShoppingListItems } = usePantry();
@@ -50,7 +56,7 @@ export default function HomeScreen({
     (() =>
       navigation.navigate(
         'AICookingAssistant' as never,
-        { initialPrompt: 'What can I cook with what I have?' } as never,
+        { initialPrompt: t('ai.emptyPrompts.cook') } as never,
       ));
   const handleViewCalendar = onViewCalendar || (() => navigation.navigate('CalendarTab' as never));
   const handlePantryInventory =
@@ -64,13 +70,19 @@ export default function HomeScreen({
     fetchAllShoppingListItems();
   }, []);
 
-  const itemsToBuy = shoppingList.filter((item) => !item.checked).length;
+  const itemsToBuy = (Array.isArray(shoppingList) ? shoppingList : []).filter(
+    (item) => !item.checked,
+  ).length;
 
   if (authLoading) {
     return (
-      <View className="flex-1 bg-linen justify-center items-center">
-        <ActivityIndicator size="large" color={colors.herb} />
-        <Text className="mt-4 text-muted text-lg">Loading your kitchen...</Text>
+      <View className="flex-1 bg-linen">
+        <View style={{ paddingTop: insets.top }}>
+          <SkeletonHero height={320} />
+          <View className="px-6 pt-6">
+            <Text className="text-muted text-lg">{t('common.loading')}</Text>
+          </View>
+        </View>
       </View>
     );
   }
@@ -79,12 +91,12 @@ export default function HomeScreen({
     <View className="flex-1 bg-linen">
       <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
         <View style={{ paddingTop: insets.top }} className="relative min-h-[520px]">
-          <ImageBackground
-            source={{
-              uri: 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=1600&q=80',
-            }}
+          <CachedImage
+            uri={HERO_IMAGE_URL}
             className="absolute inset-0"
-            resizeMode="cover"
+            style={{ width: '100%', height: '100%' }}
+            contentFit="cover"
+            accessibilityLabel={t('home.heroAlt')}
           />
           <View className="absolute inset-0 bg-linen/40" />
           <View className="absolute bottom-0 left-0 right-0 h-48 bg-linen/90" />
@@ -93,7 +105,7 @@ export default function HomeScreen({
             <TouchableOpacity
               onPress={handleSettings}
               className="p-2 rounded-lg"
-              accessibilityLabel="Settings"
+              accessibilityLabel={t('nav.settings')}
             >
               <Settings size={22} color={colors.muted} />
             </TouchableOpacity>
@@ -103,18 +115,16 @@ export default function HomeScreen({
             <Text className="font-display text-4xl font-semibold text-ink tracking-tight">
               LarderMind
             </Text>
-            <Text className="mt-3 text-lg text-ink/80">
-              Plan dinner from what's already in your kitchen
-            </Text>
+            <Text className="mt-3 text-lg text-ink/80">{t('home.heroSubtitle')}</Text>
             {user ? (
               <Text className="mt-1 text-sm text-muted">
-                Welcome back, {user.name || 'Chef'}
+                {t('home.welcomeBack', { name: user.name || 'Chef' })}
               </Text>
             ) : null}
 
             <View className="mt-8">
               <PrimaryButton
-                label="Cook with what I have"
+                label={t('home.cookCta')}
                 onPress={handleCookWithWhatIHave}
                 icon={<ChefHatIcon size={22} color={colors.onHerb} />}
               />
@@ -124,32 +134,36 @@ export default function HomeScreen({
 
         <View className="px-6 pt-8 pb-12">
           <View className="flex-row flex-wrap gap-x-6 gap-y-1 mb-6">
-            <Text className="text-sm text-muted">{pantryItems.length} items in pantry</Text>
+            <Text className="text-sm text-muted">
+              {t('home.pantryCount', { count: pantryItems.length })}
+            </Text>
             <Text className="text-sm text-line">|</Text>
-            <Text className="text-sm text-muted">{itemsToBuy} items to buy</Text>
+            <Text className="text-sm text-muted">
+              {t('home.buyCount', { count: itemsToBuy })}
+            </Text>
           </View>
 
           <ListRow
-            title="Plan Your Meals"
-            description="Schedule dishes on your calendar"
+            title={t('home.planMeals')}
+            description={t('home.planMealsDesc')}
             icon={<CalendarIcon size={20} color={colors.herb} />}
             onPress={handleViewCalendar}
           />
           <ListRow
-            title="Pantry"
-            description={`${pantryItems.length} items in stock`}
+            title={t('home.pantry')}
+            description={t('home.pantryDesc', { count: pantryItems.length })}
             icon={<Package size={20} color={colors.herb} />}
             onPress={handlePantryInventory}
           />
           <ListRow
-            title="Shopping List"
-            description={`${itemsToBuy} items to buy`}
+            title={t('home.shoppingList')}
+            description={t('home.shoppingListDesc', { count: itemsToBuy })}
             icon={<ShoppingCart size={20} color={colors.herb} />}
             onPress={handleShoppingList}
           />
           <ListRow
-            title="Recipes"
-            description="Manage your recipes"
+            title={t('home.recipes')}
+            description={t('home.recipesDesc')}
             icon={<Utensils size={20} color={colors.herb} />}
             onPress={handleRecipeManager}
           />

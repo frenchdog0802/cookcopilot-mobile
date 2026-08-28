@@ -2,6 +2,7 @@
 import { View, Text, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChefHat } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/authContext';
 import { useNavigation } from '@react-navigation/native';
 import { PrimaryButton, TextField } from '../components/ui';
@@ -13,6 +14,7 @@ interface LoginProps {
 }
 
 export default function LoginScreen({ onLoginSuccess, onSignUp }: LoginProps = {}) {
+  const { t } = useTranslation();
   const navigation = useNavigation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -23,7 +25,7 @@ export default function LoginScreen({ onLoginSuccess, onSignUp }: LoginProps = {
 
   const handleSubmit = async () => {
     if (!email || !password) {
-      setError('Please enter email and password');
+      setError(t('auth.enterEmailPassword'));
       return;
     }
     setError('');
@@ -32,10 +34,10 @@ export default function LoginScreen({ onLoginSuccess, onSignUp }: LoginProps = {
       if (success.success) {
         onLoginSuccess?.();
       } else {
-        setError(success.message || 'Invalid email or password');
+        setError(success.message || t('auth.invalidCredentials'));
       }
     } catch {
-      setError('An error occurred. Please try again.');
+      setError(t('auth.genericError'));
     }
   };
 
@@ -52,7 +54,7 @@ export default function LoginScreen({ onLoginSuccess, onSignUp }: LoginProps = {
                 <ChefHat size={24} color={colors.onHerb} />
               </View>
               <Text className="font-display text-4xl font-semibold text-ink">LarderMind</Text>
-              <Text className="mt-2 text-base text-muted">Sign in with email</Text>
+              <Text className="mt-2 text-base text-muted">{t('auth.signInTitle')}</Text>
             </View>
 
             {error ? (
@@ -62,7 +64,7 @@ export default function LoginScreen({ onLoginSuccess, onSignUp }: LoginProps = {
             ) : null}
 
             <TextField
-              label="Email"
+              label={t('auth.email')}
               containerClassName="mb-4"
               placeholder="you@example.com"
               value={email}
@@ -72,10 +74,11 @@ export default function LoginScreen({ onLoginSuccess, onSignUp }: LoginProps = {
               autoCorrect={false}
               autoComplete="email"
               editable={!submitting}
+              testID="login-email"
             />
 
             <TextField
-              label="Password"
+              label={t('auth.password')}
               containerClassName="mb-4"
               placeholder="••••••••"
               value={password}
@@ -83,6 +86,7 @@ export default function LoginScreen({ onLoginSuccess, onSignUp }: LoginProps = {
               secureTextEntry
               autoComplete="password"
               editable={!submitting}
+              testID="login-password"
             />
 
             <View className="flex-row justify-between items-center mb-6">
@@ -100,28 +104,29 @@ export default function LoginScreen({ onLoginSuccess, onSignUp }: LoginProps = {
                     <Text className="text-white text-center text-xs font-bold">✓</Text>
                   ) : null}
                 </View>
-                <Text className="text-sm text-ink">Remember me</Text>
+                <Text className="text-sm text-ink">{t('auth.rememberMe')}</Text>
               </TouchableOpacity>
             </View>
 
             <PrimaryButton
-              label="Sign in"
+              label={t('auth.signIn')}
               onPress={handleSubmit}
               loading={submitting}
               disabled={submitting}
               className="mb-6"
+              testID="login-submit"
             />
 
             <View className="items-center">
               <Text className="text-sm text-muted">
-                Don't have an account?{' '}
+                {t('auth.noAccount')}{' '}
                 <Text
                   onPress={() =>
                     onSignUp ? onSignUp() : navigation.navigate('SignUp' as never)
                   }
                   className="text-herb font-medium"
                 >
-                  Sign up
+                  {t('auth.signUp')}
                 </Text>
               </Text>
             </View>

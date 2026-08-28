@@ -11,10 +11,10 @@ interface AuthData {
 
 export const auth = {
     signin: (email: string, password: string): Promise<ApiResponse<AuthData>> => {
-        return api.post<AuthData>('/auth/signin', { email, password });
+        return api.post<AuthData>('auth/signin', { email, password });
     },
 
     signup: (user: User, password: string): Promise<ApiResponse<AuthData>> => {
-        return api.post<AuthData>('/auth/signup', { ...user, password });
+        return api.post<AuthData>('auth/signup', { ...user, password });
     },
 };

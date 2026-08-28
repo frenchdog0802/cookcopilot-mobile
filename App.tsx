@@ -1,11 +1,14 @@
 import './global.css';
-import React from 'react';
+import './src/i18n';
+import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
+import { useTranslation } from 'react-i18next';
+import { buildTabBarStyle } from './src/navigation/tabBarStyle';
 import {
   Fraunces_400Regular,
   Fraunces_500Medium,
@@ -43,6 +46,7 @@ import SubscriptionScreen from './src/screens/SubscriptionScreen';
 import { AuthProvider, useAuth } from './src/contexts/authContext';
 import { PantryProvider } from './src/contexts/pantryContext';
 import { colors } from './src/theme/tokens';
+import { initI18n } from './src/i18n';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -59,6 +63,7 @@ function AuthCheck({ children }: { children: React.ReactNode }) {
 
 function RootNavigator() {
   const { isAuthenticated } = useAuth();
+  const { t } = useTranslation();
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -68,7 +73,7 @@ function RootNavigator() {
           <Stack.Screen
             name="AICookingAssistant"
             component={AICookingAssistantScreen}
-            options={{ title: 'AI Assistant' }}
+            options={{ title: t('ai.title') }}
           />
           <Stack.Screen
             name="Subscription"
@@ -93,19 +98,15 @@ function AuthStack() {
 }
 
 function MainTabs() {
+  const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
+
   return (
     <Tab.Navigator
       screenOptions={{
         tabBarActiveTintColor: colors.herb,
         tabBarInactiveTintColor: colors.muted,
-        tabBarStyle: {
-          backgroundColor: colors.linen,
-          borderTopWidth: 1,
-          borderTopColor: colors.line,
-          paddingTop: 8,
-          paddingBottom: 8,
-          height: 75,
-        },
+        tabBarStyle: buildTabBarStyle(insets.bottom, colors),
         headerShown: false,
       }}
     >
@@ -113,7 +114,7 @@ function MainTabs() {
         name="HomeTab"
         component={HomeScreen}
         options={{
-          tabBarLabel: 'Home',
+          tabBarLabel: t('nav.home'),
           tabBarIcon: ({ color, size }) => <HouseIcon size={size} color={color} />,
         }}
       />
@@ -121,7 +122,7 @@ function MainTabs() {
         name="CalendarTab"
         component={CalendarScreen}
         options={{
-          tabBarLabel: 'Calendar',
+          tabBarLabel: t('nav.calendar'),
           tabBarIcon: ({ color, size }) => <CalendarIcon size={size} color={color} />,
         }}
       />
@@ -129,7 +130,7 @@ function MainTabs() {
         name="PantryTab"
         component={PantryInventoryScreen}
         options={{
-          tabBarLabel: 'Pantry',
+          tabBarLabel: t('nav.pantry'),
           tabBarIcon: ({ color, size }) => <PackageIcon size={size} color={color} />,
         }}
       />
@@ -137,7 +138,7 @@ function MainTabs() {
         name="ShoppingTab"
         component={ShoppingListScreen}
         options={{
-          tabBarLabel: 'Shopping',
+          tabBarLabel: t('nav.shopping'),
           tabBarIcon: ({ color, size }) => <ShoppingCartIcon size={size} color={color} />,
         }}
       />
@@ -145,7 +146,7 @@ function MainTabs() {
         name="RecipesTab"
         component={RecipeManagerScreen}
         options={{
-          tabBarLabel: 'Recipes',
+          tabBarLabel: t('nav.recipes'),
           tabBarIcon: ({ color, size }) => <UtensilsIcon size={size} color={color} />,
         }}
       />
@@ -153,7 +154,8 @@ function MainTabs() {
         name="SettingsTab"
         component={SettingsScreen}
         options={{
-          tabBarLabel: 'Settings',
+          tabBarButtonTestID: 'tab-settings',
+          tabBarLabel: t('nav.settings'),
           tabBarIcon: ({ color, size }) => <SettingsIcon size={size} color={color} />,
         }}
       />
@@ -162,6 +164,7 @@ function MainTabs() {
 }
 
 function App() {
+  const [i18nReady, setI18nReady] = useState(false);
   const [fontsLoaded, fontError] = useFonts({
     Fraunces_400Regular,
     Fraunces_500Medium,
@@ -174,7 +177,11 @@ function App() {
     SourceSans3_700Bold,
   });
 
-  if (!fontsLoaded && !fontError) {
+  useEffect(() => {
+    void initI18n().finally(() => setI18nReady(true));
+  }, []);
+
+  if ((!fontsLoaded && !fontError) || !i18nReady) {
     return (
       <SafeAreaProvider>
         <LoadingScreen fullScreen />

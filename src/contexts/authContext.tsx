@@ -4,6 +4,8 @@ import { auth } from '../api/api-auth';
 import { authHelper } from '../api/auth-helper';
 import { User } from '../types';
 
+import { clearUserOfflineData } from '../services/shoppingListOffline';
+
 export interface AuthResponse {
     success: boolean;
     message?: string;
@@ -114,9 +116,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const logout = async (): Promise<void> => {
+        const previousUserId = user?.id;
         setUser(null);
         await authHelper.clearJWT();
         await AsyncStorage.removeItem('user');
+        if (previousUserId) {
+            await clearUserOfflineData(previousUserId);
+        }
     };
 
     const value = {

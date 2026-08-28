@@ -85,6 +85,14 @@ export type ShoppingListItem = {
     default_display_unit?: string;
 };
 
+export type ShoppingListSyncStatus = {
+    isOnline: boolean;
+    pendingCount: number;
+    isSyncing: boolean;
+    lastSyncError: string | null;
+    lastSyncedAt: number | null;
+};
+
 export interface PantryItem {
     id: string;
     name: string;

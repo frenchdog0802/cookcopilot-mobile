@@ -1,25 +1,25 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
     View,
     Text,
-    FlatList,
     TouchableOpacity,
     TextInput,
-    ScrollView,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
+import { useTranslation } from 'react-i18next';
 import {
     PlusIcon,
-    MinusIcon,
-    TrashIcon,
     SearchIcon,
     PackageIcon,
 } from 'lucide-react-native';
 import { usePantry } from '../contexts/pantryContext';
 import useSearchIngredients from '../hooks/useSearchIngredient';
-import { PantryItem, IngredientEntry } from '../types';
+import { PantryItem } from '../types';
 import AppHeader from '../components/AppHeader';
 import AskAiEmptyCta from '../components/AskAiEmptyCta';
-import { UnitSelect, QuantityLabel, preferredUnitForIngredient } from '../components/UnitSelect';
+import { UnitSelect, preferredUnitForIngredient } from '../components/UnitSelect';
+import { PantryItemRow } from '../components/pantry/PantryItemRow';
+import { SkeletonList } from '../components/ui/Skeleton';
 import type { MeasurementSystem } from '../utils/units';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../theme/tokens';
@@ -29,6 +29,7 @@ interface PantryInventoryProps {
 }
 
 export default function PantryInventoryScreen({ onBack }: PantryInventoryProps = {}) {
+    const { t } = useTranslation();
     const navigation = useNavigation();
     const {
         pantryItems: oriPantryItems,
@@ -38,6 +39,7 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
         ingredients,
         fetchAllPantryItems,
         userSettings,
+        loading,
     } = usePantry();
 
     const measurementSystem = (userSettings.measurement_unit === 'imperial' ? 'imperial' : 'metric') as MeasurementSystem;
@@ -50,28 +52,35 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
         unit: '',
     });
     const [showDropdown, setShowDropdown] = useState(false);
+    const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
     useEffect(() => {
-        fetchAllPantryItems();
+        void (async () => {
+            await fetchAllPantryItems();
+            setHasLoadedOnce(true);
+        })();
     }, [fetchAllPantryItems]);
 
     useEffect(() => {
-        setPantryItems(oriPantryItems);
+        setPantryItems(Array.isArray(oriPantryItems) ? oriPantryItems : []);
     }, [oriPantryItems]);
 
-    const { filteredIngredients, loading } = useSearchIngredients(
+    const { filteredIngredients, loading: searchLoading } = useSearchIngredients(
         newItem.name,
         ingredients
     );
 
     const filteredItems = useMemo(() => {
+        const list = Array.isArray(pantryItems) ? pantryItems : [];
         if (!searchQuery.trim()) {
-            return pantryItems;
+            return list;
         }
-        return pantryItems.filter(item =>
+        return list.filter(item =>
             item.name && item.name.toLowerCase().includes(searchQuery.toLowerCase())
         );
     }, [pantryItems, searchQuery]);
+
+    const showSkeleton = !hasLoadedOnce && loading && filteredItems.length === 0;
 
     const handleAddItem = () => {
         if (!newItem.name.trim()) return;
@@ -81,9 +90,9 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
         );
 
         if (existing) {
-            updatePantryItem({ ...existing, quantity: newItem.quantity });
+            void updatePantryItem({ ...existing, quantity: newItem.quantity });
         } else {
-            addPantryItem(newItem);
+            void addPantryItem(newItem);
         }
 
         setNewItem({ name: '', quantity: 1, unit: '' });
@@ -91,182 +100,157 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
         setShowDropdown(false);
     };
 
-    const handleUpdateQuantity = (item: PantryItem, delta: number) => {
+    const handleUpdateQuantity = useCallback((item: PantryItem, delta: number) => {
         const next = item.quantity + delta;
         if (next >= 0) {
-            updatePantryItem({ ...item, quantity: next });
+            void updatePantryItem({ ...item, quantity: next });
         }
-    };
+    }, [updatePantryItem]);
 
-    const renderItem = ({ item }: { item: PantryItem }) => (
-        <View className="flex-row items-center p-3 bg-surface rounded-xl mb-2 border border-line">
-            {/* Name */}
-            <View className="flex-1 mr-3">
-                <Text
-                    className="font-semibold text-ink capitalize"
-                    numberOfLines={1}
-                >
-                    {item.name}
-                </Text>
-            </View>
+    const handleRemove = useCallback((id: string) => {
+        void removePantryItem(id);
+    }, [removePantryItem]);
 
-            {/* Quantity Controls */}
-            <View className="flex-row items-center mr-2">
-                <TouchableOpacity
-                    onPress={() => handleUpdateQuantity(item, -0.5)}
-                    className="bg-linen p-2 rounded-lg border border-line"
-                >
-                    <MinusIcon size={16} color={colors.ink} />
-                </TouchableOpacity>
+    const renderItem = useCallback(({ item }: { item: PantryItem }) => (
+        <PantryItemRow
+            item={item}
+            measurementSystem={measurementSystem}
+            onUpdateQuantity={handleUpdateQuantity}
+            onRemove={handleRemove}
+        />
+    ), [measurementSystem, handleUpdateQuantity, handleRemove]);
 
-                <QuantityLabel
-                    quantity={item.quantity}
-                    unit={item.unit}
-                    unitKind={item.unit_kind}
-                    baseUnit={item.base_unit}
-                    defaultDisplayUnit={item.default_display_unit}
-                    measurementSystem={measurementSystem}
-                    style={{ width: 72, textAlign: 'center', fontWeight: '700', fontSize: 14 }}
+    const listHeader = (
+        <View className="pb-2">
+            <View className="flex-row items-center bg-surface rounded-xl px-3 mb-4 border border-line">
+                <SearchIcon size={18} color={colors.muted} />
+                <TextInput
+                    placeholder="Search ingredients..."
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    className="flex-1 p-3"
                 />
-
-                <TouchableOpacity
-                    onPress={() => handleUpdateQuantity(item, 0.5)}
-                    className="bg-herb p-2 rounded-lg"
-                >
-                    <PlusIcon size={16} color={colors.onHerb} />
-                </TouchableOpacity>
             </View>
 
-            {/* Delete Button */}
-            <TouchableOpacity onPress={() => removePantryItem(item.id)} className="p-2">
-                <TrashIcon size={18} color={colors.danger} />
-            </TouchableOpacity>
+            {!isAddingItem ? (
+                <TouchableOpacity
+                    onPress={() => setIsAddingItem(true)}
+                    className="bg-surface border border-line rounded-xl p-4 flex-row justify-center items-center mb-4"
+                >
+                    <PlusIcon size={18} color={colors.ink} />
+                    <Text className="ml-2 font-medium text-ink">Add New Item</Text>
+                </TouchableOpacity>
+            ) : (
+                <View className="bg-surface rounded-xl p-4 mb-4 border border-line">
+                    <TextInput
+                        placeholder="Item name"
+                        value={newItem.name}
+                        onChangeText={text => {
+                            setNewItem({ ...newItem, name: text });
+                            setShowDropdown(true);
+                        }}
+                        className="border border-line rounded-lg p-2 mb-2 bg-linen text-ink"
+                    />
+
+                    {showDropdown && (
+                        <View className="border border-line rounded-lg mb-2 bg-linen">
+                            {searchLoading ? (
+                                <Text className="p-3 text-center">Loading...</Text>
+                            ) : (
+                                filteredIngredients.map(i => (
+                                    <TouchableOpacity
+                                        key={i.id}
+                                        onPress={() => {
+                                            setNewItem({
+                                                name: i.name,
+                                                quantity: 1,
+                                                unit: preferredUnitForIngredient(i, measurementSystem).unit,
+                                            });
+                                            setShowDropdown(false);
+                                        }}
+                                        className="p-3"
+                                    >
+                                        <Text>{i.name}</Text>
+                                    </TouchableOpacity>
+                                ))
+                            )}
+                        </View>
+                    )}
+
+                    <View className="mb-3">
+                        <UnitSelect
+                            kind={preferredUnitForIngredient(
+                                ingredients.find(x => x.name.toLowerCase() === newItem.name.toLowerCase()) || {
+                                    default_unit: newItem.unit,
+                                },
+                                measurementSystem,
+                            ).kind}
+                            value={newItem.unit}
+                            onChange={unit => setNewItem({ ...newItem, unit })}
+                            measurementSystem={measurementSystem}
+                            preferSystemUnits
+                        />
+                    </View>
+                    <View className="flex-row gap-2">
+                        <TouchableOpacity
+                            onPress={() => setIsAddingItem(false)}
+                            className="flex-1 bg-linen border border-line p-3 rounded-lg"
+                        >
+                            <Text className="text-center">Cancel</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            onPress={handleAddItem}
+                            className="flex-1 bg-herb p-3 rounded-lg"
+                        >
+                            <Text className="text-white text-center">Add</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            )}
+        </View>
+    );
+
+    const listEmpty = (
+        <View className="bg-surface rounded-xl p-6 items-center border border-line">
+            <PackageIcon size={32} color={colors.line} />
+            <Text className="text-muted mt-2">No items found</Text>
+            {!searchQuery && (
+                <AskAiEmptyCta
+                    hint="Skip the forms ??just tell the AI what you need."
+                    label="Ask AI to update pantry"
+                    onPress={() =>
+                        navigation.navigate(
+                            'AICookingAssistant' as never,
+                            { initialPrompt: 'Add chicken, rice, and broccoli to my pantry' } as never,
+                        )
+                    }
+                />
+            )}
         </View>
     );
 
     return (
         <View className="flex-1 bg-linen">
-            <AppHeader title="Kitchen Inventory" showBackButton onBack={onBack} />
+            <AppHeader title={t('pantry.title')} showBackButton onBack={onBack} />
 
-            <ScrollView className="flex-1 p-4">
-                {/* Search */}
-                <View className="flex-row items-center bg-surface rounded-xl px-3 mb-4 border border-line">
-                    <SearchIcon size={18} color={colors.muted} />
-                    <TextInput
-                        placeholder="Search ingredients..."
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        className="flex-1 p-3"
-                    />
-                </View>
-
-                {/* Add Item */}
-                {!isAddingItem ? (
-                    <TouchableOpacity
-                        onPress={() => setIsAddingItem(true)}
-                        className="bg-surface border border-line rounded-xl p-4 flex-row justify-center items-center mb-4"
-                    >
-                        <PlusIcon size={18} color={colors.ink} />
-                        <Text className="ml-2 font-medium text-ink">Add New Item</Text>
-                    </TouchableOpacity>
+            <View className="flex-1 p-4">
+                {showSkeleton ? (
+                    <>
+                        {listHeader}
+                        <SkeletonList count={6} />
+                    </>
                 ) : (
-                    <View className="bg-surface rounded-xl p-4 mb-4 border border-line">
-                        <TextInput
-                            placeholder="Item name"
-                            value={newItem.name}
-                            onChangeText={text => {
-                                setNewItem({ ...newItem, name: text });
-                                setShowDropdown(true);
-                            }}
-                            className="border border-line rounded-lg p-2 mb-2 bg-linen text-ink"
-                        />
-
-                        {showDropdown && (
-                            <View className="border border-line rounded-lg mb-2 bg-linen">
-                                {loading ? (
-                                    <Text className="p-3 text-center">Loading…</Text>
-                                ) : (
-                                    filteredIngredients.map(i => (
-                                        <TouchableOpacity
-                                            key={i.id}
-                                            onPress={() => {
-                                                setNewItem({
-                                                    name: i.name,
-                                                    quantity: 1,
-                                                    unit: preferredUnitForIngredient(i, measurementSystem).unit,
-                                                });
-                                                setShowDropdown(false);
-                                            }}
-                                            className="p-3"
-                                        >
-                                            <Text>{i.name}</Text>
-                                        </TouchableOpacity>
-                                    ))
-                                )}
-                            </View>
-                        )}
-
-                        <View className="mb-3">
-                            <UnitSelect
-                                kind={preferredUnitForIngredient(
-                                    ingredients.find(x => x.name.toLowerCase() === newItem.name.toLowerCase()) || {
-                                        default_unit: newItem.unit,
-                                    },
-                                    measurementSystem,
-                                ).kind}
-                                value={newItem.unit}
-                                onChange={unit => setNewItem({ ...newItem, unit })}
-                                measurementSystem={measurementSystem}
-                                preferSystemUnits
-                            />
-                        </View>
-                        <View className="flex-row gap-2">
-                            <TouchableOpacity
-                                onPress={() => setIsAddingItem(false)}
-                                className="flex-1 bg-linen border border-line p-3 rounded-lg"
-                            >
-                                <Text className="text-center">Cancel</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                onPress={handleAddItem}
-                                className="flex-1 bg-herb p-3 rounded-lg"
-                            >
-                                <Text className="text-white text-center">Add</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                )}
-
-                {/* List */}
-                {filteredItems.length === 0 ? (
-                    <View className="bg-surface rounded-xl p-6 items-center border border-line">
-                        <PackageIcon size={32} color={colors.line} />
-                        <Text className="text-muted mt-2">
-                            No items found
-                        </Text>
-                        {!searchQuery && (
-                            <AskAiEmptyCta
-                                hint="Skip the forms — just tell the AI what you need."
-                                label="Ask AI to update pantry"
-                                onPress={() =>
-                                    navigation.navigate(
-                                        'AICookingAssistant' as never,
-                                        { initialPrompt: 'Add chicken, rice, and broccoli to my pantry' } as never,
-                                    )
-                                }
-                            />
-                        )}
-                    </View>
-                ) : (
-                    <FlatList
+                    <FlashList
                         data={filteredItems}
                         keyExtractor={item => String(item.id)}
                         renderItem={renderItem}
-                        scrollEnabled={false}
+                        ListHeaderComponent={listHeader}
+                        ListEmptyComponent={listEmpty}
+                        keyboardShouldPersistTaps="handled"
                     />
                 )}
-            </ScrollView>
+            </View>
         </View>
     );
 }

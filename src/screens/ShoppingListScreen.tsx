@@ -1,44 +1,43 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, FlatList, TouchableOpacity, TextInput } from 'react-native';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { View, Text, TouchableOpacity, TextInput } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
+import { useTranslation } from 'react-i18next';
 import { usePantry } from '../contexts/pantryContext';
-import { PlusIcon, MinusIcon, CheckIcon, SearchIcon, TrashIcon, XIcon } from 'lucide-react-native';
+import { PlusIcon, CheckIcon, SearchIcon, XIcon } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import AppHeader from '../components/AppHeader';
 import AskAiEmptyCta from '../components/AskAiEmptyCta';
-import { UnitSelect, QuantityLabel, preferredUnitForIngredient } from '../components/UnitSelect';
+import { UnitSelect, preferredUnitForIngredient } from '../components/UnitSelect';
+import { ShoppingListRow, type ShoppingListRowItem } from '../components/shopping/ShoppingListRow';
+import { SkeletonList } from '../components/ui/Skeleton';
 import type { MeasurementSystem } from '../utils/units';
 import { colors } from '../theme/tokens';
 
-interface ShoppingListItem {
-    id: string;
-    name: string;
-    quantity: number;
-    unit: string;
-    checked: boolean;
-    unit_kind?: string;
-    base_unit?: string;
-    default_display_unit?: string;
-}
-
 export default function ShoppingListScreen() {
+    const { t } = useTranslation();
     const navigation = useNavigation();
     const {
         shoppingList: oriShoppingList,
+        shoppingListSyncStatus,
         fetchAllShoppingListItems,
         fetchAllPantryItems,
         updateShoppingListItem,
         addShoppingListItem,
+        removeShoppingListItem,
+        retryShoppingListSync,
         ingredients,
         userSettings,
+        loading,
     } = usePantry();
 
     const measurementSystem = (userSettings.measurement_unit === 'imperial' ? 'imperial' : 'metric') as MeasurementSystem;
-    const [shoppingList, setShoppingList] = useState<ShoppingListItem[]>([]);
+    const [shoppingList, setShoppingList] = useState<ShoppingListRowItem[]>([]);
     const [showMessage, setShowMessage] = useState(false);
     const [message, setMessage] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [isAddingItem, setIsAddingItem] = useState(false);
     const [isCompletingAll, setIsCompletingAll] = useState(false);
+    const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
     const [newItem, setNewItem] = useState({
         name: '',
         quantity: '1',
@@ -46,33 +45,38 @@ export default function ShoppingListScreen() {
     });
 
     useEffect(() => {
-        fetchAllShoppingListItems();
-    }, []);
+        void (async () => {
+            await fetchAllShoppingListItems();
+            setHasLoadedOnce(true);
+        })();
+    }, [fetchAllShoppingListItems]);
 
     useEffect(() => {
-        if (oriShoppingList) {
-            setShoppingList(oriShoppingList as any);
+        if (Array.isArray(oriShoppingList)) {
+            setShoppingList(oriShoppingList as ShoppingListRowItem[]);
         }
     }, [oriShoppingList]);
 
-    // Filter shopping list items
     const filteredItems = useMemo(() => {
+        const list = Array.isArray(shoppingList) ? shoppingList : [];
         if (!searchQuery.trim()) {
-            return shoppingList;
+            return list;
         }
-        return shoppingList.filter(item => {
+        return list.filter(item => {
             return item.name && item.name.toLowerCase().includes(searchQuery.toLowerCase());
         });
     }, [shoppingList, searchQuery]);
 
-    const handleUpdateQuantity = async (item: ShoppingListItem, delta: number) => {
+    const showSkeleton = !hasLoadedOnce && loading && filteredItems.length === 0;
+
+    const handleUpdateQuantity = useCallback(async (item: ShoppingListRowItem, delta: number) => {
         const next = item.quantity + delta;
         if (next >= 0) {
             await updateShoppingListItem({ ...item, quantity: next });
         }
-    };
+    }, [updateShoppingListItem]);
 
-    const handleTogglePurchased = async (id: string) => {
+    const handleTogglePurchased = useCallback(async (id: string) => {
         const item = shoppingList.find(i => i.id === id);
         if (item) {
             await updateShoppingListItem({ ...item, checked: !item.checked });
@@ -80,15 +84,19 @@ export default function ShoppingListScreen() {
             setShowMessage(true);
             setTimeout(() => setShowMessage(false), 2000);
         }
-    };
+    }, [shoppingList, updateShoppingListItem]);
+
+    const handleRemove = useCallback((id: string) => {
+        void removeShoppingListItem(id);
+    }, [removeShoppingListItem]);
 
     const uncheckedCount = useMemo(
-        () => shoppingList.filter(item => !item.checked).length,
+        () => (Array.isArray(shoppingList) ? shoppingList : []).filter(item => !item.checked).length,
         [shoppingList]
     );
 
     const handleCompleteAll = async () => {
-        const unchecked = shoppingList.filter(item => !item.checked);
+        const unchecked = (Array.isArray(shoppingList) ? shoppingList : []).filter(item => !item.checked);
         if (unchecked.length === 0 || isCompletingAll) return;
 
         setIsCompletingAll(true);
@@ -127,75 +135,53 @@ export default function ShoppingListScreen() {
         setTimeout(() => setShowMessage(false), 2000);
     };
 
-    const renderItem = ({ item }: { item: ShoppingListItem }) => (
-        <View className={`flex-row items-center p-3 bg-surface rounded-xl mb-2 border border-line ${item.checked ? 'opacity-70' : ''}`}>
-            {/* Checkbox */}
-            <TouchableOpacity onPress={() => handleTogglePurchased(item.id)} className="mr-3">
-                <View
-                    className={`w-6 h-6 rounded border-2 items-center justify-center ${item.checked ? 'bg-herb border-herb' : 'border-line'}`}
-                >
-                    {item.checked && <CheckIcon size={14} color={colors.onHerb} />}
-                </View>
-            </TouchableOpacity>
-
-            {/* Name & quantity */}
-            <View className="flex-1 mr-3">
-                <Text
-                    className={`font-medium capitalize ${item.checked ? 'line-through text-muted' : 'text-ink'}`}
-                    numberOfLines={1}
-                >
-                    {item.name}
-                </Text>
-                <QuantityLabel
-                    quantity={item.quantity}
-                    unit={item.unit}
-                    unitKind={item.unit_kind}
-                    baseUnit={item.base_unit}
-                    defaultDisplayUnit={item.default_display_unit}
-                    measurementSystem={measurementSystem}
-                    style={{ fontSize: 12, color: item.checked ? colors.line : colors.muted }}
-                />
-            </View>
-
-            {/* Quantity Controls */}
-            <View className="flex-row items-center mr-2">
-                <TouchableOpacity
-                    onPress={() => handleUpdateQuantity(item, -0.5)}
-                    className="bg-linen p-2 rounded-lg border border-line"
-                >
-                    <MinusIcon size={16} color={colors.ink} />
-                </TouchableOpacity>
-
-                <Text className="text-lg font-bold w-12 text-center">{item.quantity}</Text>
-
-                <TouchableOpacity
-                    onPress={() => handleUpdateQuantity(item, 0.5)}
-                    className="bg-herb p-2 rounded-lg"
-                >
-                    <PlusIcon size={16} color={colors.onHerb} />
-                </TouchableOpacity>
-            </View>
-
-            {/* Delete Button */}
-            <TouchableOpacity className="p-2">
-                <TrashIcon size={18} color={colors.danger} />
-            </TouchableOpacity>
-        </View>
-    );
+    const renderItem = useCallback(({ item }: { item: ShoppingListRowItem }) => (
+        <ShoppingListRow
+            item={item}
+            measurementSystem={measurementSystem}
+            onToggle={handleTogglePurchased}
+            onUpdateQuantity={handleUpdateQuantity}
+            onRemove={handleRemove}
+        />
+    ), [measurementSystem, handleTogglePurchased, handleUpdateQuantity, handleRemove]);
 
     return (
         <View className="flex-1 bg-linen">
-            <AppHeader title="Shopping List" showBackButton />
+            <AppHeader title={t('shopping.title')} showBackButton />
 
             <View className="flex-1 p-4">
-                {/* Success Message */}
+                {(!shoppingListSyncStatus.isOnline ||
+                    shoppingListSyncStatus.pendingCount > 0 ||
+                    shoppingListSyncStatus.lastSyncError) && (
+                    <View className="mb-4 p-3 bg-sage border border-line rounded-xl">
+                        <Text className="text-herb-deep text-sm font-medium">
+                            {!shoppingListSyncStatus.isOnline
+                                ? 'You?™re offline ??changes save on this device'
+                                : shoppingListSyncStatus.isSyncing
+                                  ? `Syncing ${shoppingListSyncStatus.pendingCount} change${shoppingListSyncStatus.pendingCount === 1 ? '' : 's'}?¦`
+                                  : shoppingListSyncStatus.lastSyncError
+                                    ? shoppingListSyncStatus.lastSyncError
+                                    : `${shoppingListSyncStatus.pendingCount} change${shoppingListSyncStatus.pendingCount === 1 ? '' : 's'} waiting to sync`}
+                        </Text>
+                        {shoppingListSyncStatus.isOnline &&
+                            shoppingListSyncStatus.lastSyncError &&
+                            shoppingListSyncStatus.pendingCount > 0 && (
+                                <TouchableOpacity
+                                    onPress={() => void retryShoppingListSync()}
+                                    className="mt-2 self-start bg-herb px-3 py-1.5 rounded-lg"
+                                >
+                                    <Text className="text-white text-sm font-medium">Retry sync</Text>
+                                </TouchableOpacity>
+                            )}
+                    </View>
+                )}
+
                 {showMessage && (
                     <View className="mb-4 p-3 bg-sage border border-line rounded-xl">
                         <Text className="text-herb-deep text-sm font-medium">{message}</Text>
                     </View>
                 )}
 
-                {/* Search Bar */}
                 <View className="relative mb-4">
                     <View className="absolute left-3 top-3 z-10">
                         <SearchIcon size={18} color={colors.muted} />
@@ -208,7 +194,6 @@ export default function ShoppingListScreen() {
                     />
                 </View>
 
-                {/* Add New Item Button / Form */}
                 {!isAddingItem ? (
                     <TouchableOpacity
                         onPress={() => setIsAddingItem(true)}
@@ -277,7 +262,6 @@ export default function ShoppingListScreen() {
                     </View>
                 )}
 
-                {/* Shopping List */}
                 <View className="bg-surface rounded-xl overflow-hidden flex-1 border border-line">
                     <View className="p-4 border-b border-line bg-linen flex-row items-center justify-between">
                         <Text className="font-semibold text-ink">Items to Buy</Text>
@@ -297,19 +281,21 @@ export default function ShoppingListScreen() {
                                     uncheckedCount === 0 || isCompletingAll ? 'text-muted' : 'text-white'
                                 }`}
                             >
-                                {isCompletingAll ? 'Completingâ€¦' : 'Complete all'}
+                                {isCompletingAll ? 'Completing...' : 'Complete all'}
                             </Text>
                         </TouchableOpacity>
                     </View>
 
-                    {filteredItems.length === 0 ? (
+                    {showSkeleton ? (
+                        <SkeletonList count={5} />
+                    ) : filteredItems.length === 0 ? (
                         <View className="p-6 items-center">
                             <Text className="text-muted">No items in your shopping list</Text>
                             {searchQuery ? (
                                 <Text className="text-muted text-sm mt-1">Try a different search term</Text>
                             ) : (
                                 <AskAiEmptyCta
-                                    hint="Skip the forms â€” just tell the AI what you need."
+                                    hint="Skip the forms ??just tell the AI what you need."
                                     label="Ask AI to build a list"
                                     onPress={() =>
                                         navigation.navigate(
@@ -321,7 +307,7 @@ export default function ShoppingListScreen() {
                             )}
                         </View>
                     ) : (
-                        <FlatList
+                        <FlashList
                             data={filteredItems}
                             renderItem={renderItem}
                             keyExtractor={(item) => item.id.toString()}

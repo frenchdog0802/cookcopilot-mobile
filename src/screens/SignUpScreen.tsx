@@ -2,6 +2,7 @@
 import { View, Text, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChefHat } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contexts/authContext';
 import { User } from '../types';
@@ -9,6 +10,7 @@ import { PrimaryButton, TextField } from '../components/ui';
 import { colors } from '../theme/tokens';
 
 export default function SignUpScreen() {
+  const { t } = useTranslation();
   const navigation = useNavigation();
   const { signUp, submitting } = useAuth();
 
@@ -21,17 +23,17 @@ export default function SignUpScreen() {
 
   const handleSubmit = async () => {
     if (!firstName || !lastName || !email || !password) {
-      setError('Please fill all fields');
+      setError(t('auth.fillAllFields'));
       return;
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setError(t('auth.passwordsMismatch'));
       return;
     }
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError(t('auth.passwordMinLength'));
       return;
     }
 
@@ -48,10 +50,10 @@ export default function SignUpScreen() {
       const response = await signUp(user, password);
 
       if (!response.success) {
-        setError(response.message || 'Sign up failed');
+        setError(response.message || t('auth.signUpFailed'));
       }
     } catch {
-      setError('An error occurred. Please try again.');
+      setError(t('auth.genericError'));
     }
   };
 
@@ -73,7 +75,7 @@ export default function SignUpScreen() {
                   <ChefHat size={24} color={colors.onHerb} />
                 </View>
                 <Text className="font-display text-4xl font-semibold text-ink">LarderMind</Text>
-                <Text className="mt-2 text-base text-muted">Create your account with email</Text>
+                <Text className="mt-2 text-base text-muted">{t('auth.signUpTitle')}</Text>
               </View>
 
               {error ? (
@@ -84,7 +86,7 @@ export default function SignUpScreen() {
 
               <View className="flex-row gap-3 mb-4">
                 <TextField
-                  label="First Name"
+                  label={t('auth.firstName')}
                   containerClassName="flex-1"
                   placeholder="John"
                   value={firstName}
@@ -93,7 +95,7 @@ export default function SignUpScreen() {
                   editable={!submitting}
                 />
                 <TextField
-                  label="Last Name"
+                  label={t('auth.lastName')}
                   containerClassName="flex-1"
                   placeholder="Doe"
                   value={lastName}
@@ -104,7 +106,7 @@ export default function SignUpScreen() {
               </View>
 
               <TextField
-                label="Email"
+                label={t('auth.email')}
                 containerClassName="mb-4"
                 placeholder="you@example.com"
                 value={email}
@@ -117,7 +119,7 @@ export default function SignUpScreen() {
               />
 
               <TextField
-                label="Password"
+                label={t('auth.password')}
                 containerClassName="mb-4"
                 placeholder="••••••••"
                 value={password}
@@ -128,7 +130,7 @@ export default function SignUpScreen() {
               />
 
               <TextField
-                label="Confirm Password"
+                label={t('auth.confirmPassword')}
                 containerClassName="mb-6"
                 placeholder="••••••••"
                 value={confirmPassword}
@@ -139,7 +141,7 @@ export default function SignUpScreen() {
               />
 
               <PrimaryButton
-                label="Sign up"
+                label={t('auth.signUp')}
                 onPress={handleSubmit}
                 loading={submitting}
                 disabled={submitting}
@@ -148,9 +150,9 @@ export default function SignUpScreen() {
 
               <View className="items-center">
                 <Text className="text-sm text-muted">
-                  Already have an account?{' '}
+                  {t('auth.haveAccount')}{' '}
                   <Text onPress={() => navigation.goBack()} className="text-herb font-medium">
-                    Log in
+                    {t('auth.logIn')}
                   </Text>
                 </Text>
               </View>

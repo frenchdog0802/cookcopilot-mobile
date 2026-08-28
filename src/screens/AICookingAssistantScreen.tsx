@@ -1,10 +1,9 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
     TextInput,
     TouchableOpacity,
-    FlatList,
     ScrollView,
     KeyboardAvoidingView,
     Platform,
@@ -13,6 +12,8 @@ import {
     NativeSyntheticEvent,
     TextInputContentSizeChangeEventData,
 } from 'react-native';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
+import { useTranslation } from 'react-i18next';
 import {
     SendIcon,
     RefreshCwIcon,
@@ -22,10 +23,11 @@ import { useNavigation, useRoute, type RouteProp } from '@react-navigation/nativ
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePantry } from '../contexts/pantryContext';
 import AppHeader from '../components/AppHeader';
-import ChatMessageContent from '../components/ChatMessageContent';
+import { ChatMessageRow } from '../components/chat/ChatMessageRow';
 import { chatApi, ChatResponseData, ChatResponseType, HistoryMessage } from '../api/chat';
 import { mealPlanApi } from '../api/mealPlan';
 import { colors } from '../theme/tokens';
+import { SkeletonList } from '../components/ui/Skeleton';
 
 /** Matches ChatGPT / Claude-style mobile composers: comfortable single line, grows with content. */
 const INPUT_MIN_HEIGHT = 44;
@@ -68,7 +70,7 @@ interface Message {
 const WELCOME_MESSAGE: Message = {
     id: 'welcome',
     role: 'assistant',
-    content: "Hi! Tell me what you need — import a recipe URL, plan your week, update your pantry, or ask what you can cook. I'll handle it and show you what changed.",
+    content: "Hi! Tell me what you need ??import a recipe URL, plan your week, update your pantry, or ask what you can cook. I'll handle it and show you what changed.",
     timestamp: Date.now(),
 };
 
@@ -80,6 +82,7 @@ const SUGGESTED_PROMPTS = [
 ];
 
 export default function AICookingAssistantScreen() {
+    const { t } = useTranslation();
     const navigation = useNavigation();
     const route = useRoute<RouteProp<AICookingAssistantParams, 'AICookingAssistant'>>();
     const insets = useSafeAreaInsets();
@@ -89,7 +92,8 @@ export default function AICookingAssistantScreen() {
         fetchAllPantryItems,
         fetchAllMealPlans,
     } = usePantry();
-    const flatListRef = useRef<FlatList>(null);
+    const flatListRef = useRef<FlashListRef<Message>>(null);
+    const [historyReady, setHistoryReady] = useState(false);
 
     const [input, setInput] = useState('');
     const [inputHeight, setInputHeight] = useState(INPUT_MIN_HEIGHT);
@@ -130,10 +134,12 @@ export default function AICookingAssistantScreen() {
                 }
             } catch (error) {
                 console.error('Failed to load chat history', error);
+            } finally {
+                setHistoryReady(true);
             }
         };
 
-        loadHistory();
+        void loadHistory();
     }, []);
 
     const cardTypes: ChatResponseType[] = [
@@ -218,7 +224,7 @@ export default function AICookingAssistantScreen() {
         }
     };
 
-    const handleAddCreatedRecipeToMenu = async (recipeId: string) => {
+    const handleAddCreatedRecipeToMenu = useCallback(async (recipeId: string) => {
         setAddingToMenuRecipeId(recipeId);
         try {
             const servingDate = new Date().toISOString().slice(0, 10);
@@ -241,36 +247,36 @@ export default function AICookingAssistantScreen() {
         } finally {
             setAddingToMenuRecipeId(null);
         }
-    };
+    }, [fetchAllMealPlans, fetchAllRecipes]);
 
-    const handleViewCreatedRecipe = async (recipeId: string) => {
+    const handleViewCreatedRecipe = useCallback(async (recipeId: string) => {
         await fetchAllRecipes();
         (navigation as { navigate: (name: string, params?: object) => void }).navigate('Main', {
             screen: 'RecipesTab',
             params: { recipeId },
         });
-    };
+    }, [fetchAllRecipes, navigation]);
 
-    const handleViewShoppingList = async () => {
+    const handleViewShoppingList = useCallback(async () => {
         await fetchAllShoppingListItems();
         (navigation as { navigate: (name: string, params?: object) => void }).navigate('Main', {
             screen: 'ShoppingTab',
         });
-    };
+    }, [fetchAllShoppingListItems, navigation]);
 
-    const handleViewCalendar = async () => {
+    const handleViewCalendar = useCallback(async () => {
         await fetchAllMealPlans();
         (navigation as { navigate: (name: string, params?: object) => void }).navigate('Main', {
             screen: 'CalendarTab',
         });
-    };
+    }, [fetchAllMealPlans, navigation]);
 
-    const handleViewPantry = async () => {
+    const handleViewPantry = useCallback(async () => {
         await fetchAllPantryItems();
         (navigation as { navigate: (name: string, params?: object) => void }).navigate('Main', {
             screen: 'PantryTab',
         });
-    };
+    }, [fetchAllPantryItems, navigation]);
 
     const handleClearChat = () => {
         setMessages([{
@@ -281,152 +287,29 @@ export default function AICookingAssistantScreen() {
         }]);
     };
 
-    const renderMessage = ({ item }: { item: Message }) => {
-        const isUser = item.role === 'user';
-
-        return (
-            <View className={`mb-4 ${isUser ? 'items-end' : 'items-start'}`}>
-                <View
-                    className={`max-w-[85%] rounded-2xl px-4 py-3 ${isUser ? 'bg-herb' : item.type === 'error' ? 'bg-sage border border-line' : 'bg-surface border border-line'
-                        }`}
-                >
-                    <ChatMessageContent
-                        content={item.content}
-                        isUser={isUser}
-                        style={item.type === 'error' && !isUser ? { color: colors.danger } : undefined}
-                    />
-
-                    {(item.type === 'recipe_created' || item.type === 'recipe_imported') && item.cardData && (
-                        <View className="mt-3 bg-linen rounded-xl p-4 border border-line">
-                            <Text className="font-bold text-lg text-ink mb-1">
-                                {item.type === 'recipe_imported' ? 'Imported' : 'Recipe'}: {item.cardData.recipeName}
-                            </Text>
-                            <Text className="text-sm text-muted mb-3">
-                                {item.cardData.ingredientCount ?? 0} ingredients · {(item.cardData.steps ?? []).length} steps
-                            </Text>
-                            {(item.cardData.steps ?? []).length > 0 && (
-                                <View className="mb-3">
-                                    {(item.cardData.steps ?? []).map((step, index) => (
-                                        <View key={index} className="flex-row mb-2">
-                                            <View className="w-5 h-5 rounded-full bg-sage items-center justify-center mr-2 mt-0.5">
-                                                <Text className="text-xs font-medium text-herb-deep">{index + 1}</Text>
-                                            </View>
-                                            <Text className="flex-1 text-sm text-ink leading-5">{step}</Text>
-                                        </View>
-                                    ))}
-                                </View>
-                            )}
-                            <View className="flex-row gap-2">
-                                <TouchableOpacity
-                                    onPress={() => item.cardData?.recipeId && handleViewCreatedRecipe(item.cardData.recipeId)}
-                                    className="flex-1 bg-sage py-2 rounded-lg items-center border border-line"
-                                >
-                                    <Text className="text-herb-deep text-sm">Edit Recipe</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    onPress={() => item.cardData?.recipeId && handleAddCreatedRecipeToMenu(item.cardData.recipeId)}
-                                    disabled={addingToMenuRecipeId === item.cardData.recipeId}
-                                    className="flex-1 bg-sage py-2 rounded-lg items-center border border-line"
-                                >
-                                    <Text className="text-herb-deep text-sm">Add to today's dinner</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    )}
-
-                    {item.type === 'recipe_updated' && item.cardData && (
-                        <View className="mt-3 bg-linen rounded-xl p-4 border border-line">
-                            <Text className="font-medium text-ink">Updated: {item.cardData.recipeName}</Text>
-                            <TouchableOpacity
-                                onPress={() => item.cardData?.recipeId && handleViewCreatedRecipe(item.cardData.recipeId)}
-                                className="mt-3 bg-sage py-2 rounded-lg items-center border border-line"
-                            >
-                                <Text className="text-herb-deep text-sm">Edit Recipe</Text>
-                            </TouchableOpacity>
-                        </View>
-                    )}
-
-                    {item.type === 'shopping_list_updated' && item.cardData && (
-                        <View className="mt-3 bg-linen rounded-xl p-4 border border-line">
-                            <Text className="font-medium text-ink mb-2">
-                                Added {item.cardData.itemsAdded ?? 0} items to your shopping list
-                            </Text>
-                            <View className="flex-row flex-wrap gap-2 mb-3">
-                                {(item.cardData.items ?? []).map((shoppingItem, index) => (
-                                    <View key={`${shoppingItem.name}-${index}`} className="bg-sage px-2 py-1 rounded-full">
-                                        <Text className="text-herb-deep text-xs">{shoppingItem.name}</Text>
-                                    </View>
-                                ))}
-                            </View>
-                            <TouchableOpacity
-                                onPress={handleViewShoppingList}
-                                className="bg-herb py-2 rounded-lg items-center"
-                            >
-                                <Text className="text-white text-sm">View Shopping List</Text>
-                            </TouchableOpacity>
-                        </View>
-                    )}
-
-                    {item.type === 'meal_plan_updated' && item.cardData && (
-                        <View className="mt-3 bg-linen rounded-xl p-4 border border-line">
-                            <Text className="font-medium text-ink mb-2">
-                                {item.cardData.mealsScheduled
-                                    ? `Scheduled ${item.cardData.mealsScheduled} meal(s)`
-                                    : `${item.cardData.recipeName} — ${item.cardData.mealType} on ${item.cardData.servingDate}`}
-                            </Text>
-                            <TouchableOpacity onPress={handleViewCalendar} className="bg-herb py-2 rounded-lg items-center">
-                                <Text className="text-white text-sm">Open Calendar</Text>
-                            </TouchableOpacity>
-                        </View>
-                    )}
-
-                    {item.type === 'pantry_updated' && item.cardData && (
-                        <View className="mt-3 bg-linen rounded-xl p-4 border border-line">
-                            <Text className="font-medium text-ink mb-2">
-                                {item.cardData.removedDuplicates != null
-                                    ? `Pantry organized — merged ${item.cardData.mergedGroups ?? 0} group(s)`
-                                    : `Added ${item.cardData.itemsAdded ?? 0} item(s) to pantry`}
-                            </Text>
-                            <TouchableOpacity onPress={handleViewPantry} className="bg-herb py-2 rounded-lg items-center">
-                                <Text className="text-white text-sm">Open Pantry</Text>
-                            </TouchableOpacity>
-                        </View>
-                    )}
-
-                    {item.type === 'meal_suggestions' && item.cardData && (
-                        <View className="mt-3 bg-linen rounded-xl p-4 border border-line">
-                            <Text className="font-medium text-ink mb-2">Meal suggestions</Text>
-                            {(item.cardData.suggestions ?? []).map((s, index) => (
-                                <Text key={index} className="text-sm text-muted">
-                                    {s.recipeName} — {s.matchScore}% match
-                                </Text>
-                            ))}
-                            <TouchableOpacity onPress={handleViewCalendar} className="mt-3 bg-sage py-2 rounded-lg items-center border border-line">
-                                <Text className="text-herb-deep text-sm">View Calendar</Text>
-                            </TouchableOpacity>
-                        </View>
-                    )}
-
-                    {item.type === 'multi_action' && item.cardData && (
-                        <View className="mt-3 bg-linen rounded-xl p-4 border border-line">
-                            <Text className="font-medium text-ink">
-                                Completed {item.cardData.actionCount ?? 0} action(s)
-                            </Text>
-                        </View>
-                    )}
-                </View>
-
-                <Text className="text-xs text-muted mt-1 mx-2">
-                    {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-            </View>
-        );
-    };
+    const renderMessage = useCallback(({ item }: { item: Message }) => (
+        <ChatMessageRow
+            item={item}
+            addingToMenuRecipeId={addingToMenuRecipeId}
+            onViewCreatedRecipe={handleViewCreatedRecipe}
+            onAddCreatedRecipeToMenu={handleAddCreatedRecipeToMenu}
+            onViewShoppingList={handleViewShoppingList}
+            onViewCalendar={handleViewCalendar}
+            onViewPantry={handleViewPantry}
+        />
+    ), [
+        addingToMenuRecipeId,
+        handleViewCreatedRecipe,
+        handleAddCreatedRecipeToMenu,
+        handleViewShoppingList,
+        handleViewCalendar,
+        handleViewPantry,
+    ]);
 
     return (
         <View className="flex-1 bg-linen">
             <AppHeader
-                title="AI Cooking Assistant"
+                title={t('ai.title')}
                 showBackButton
                 rightElement={<RefreshCwIcon size={20} color={colors.ink} />}
                 onRightPress={handleClearChat}
@@ -437,15 +320,21 @@ export default function AICookingAssistantScreen() {
                 className="flex-1"
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
             >
-                <FlatList
-                    ref={flatListRef}
-                    data={messages}
-                    renderItem={renderMessage}
-                    keyExtractor={(item) => item.id}
-                    contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
-                    onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
-                    keyboardShouldPersistTaps="handled"
-                />
+                {!historyReady ? (
+                    <View className="flex-1 px-4 pt-4">
+                        <SkeletonList count={4} />
+                    </View>
+                ) : (
+                    <FlashList
+                        ref={flatListRef}
+                        data={messages}
+                        renderItem={renderMessage}
+                        keyExtractor={(item) => item.id}
+                        contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
+                        onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
+                        keyboardShouldPersistTaps="handled"
+                    />
+                )}
 
                 {isTyping && (
                     <View className="px-4 pb-2">
@@ -492,7 +381,7 @@ export default function AICookingAssistantScreen() {
                                     paddingBottom: Platform.OS === 'ios' ? 10 : 8,
                                     marginRight: 8,
                                 }}
-                                placeholder="Message LarderMind…"
+                                placeholder="Message LarderMind"
                                 placeholderTextColor={colors.muted}
                                 value={input}
                                 onChangeText={setInput}

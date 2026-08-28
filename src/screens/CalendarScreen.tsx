@@ -9,6 +9,7 @@ import {
     Alert,
     Dimensions,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Calendar as RNCalendar } from 'react-native-calendars';
 import {
     ChevronLeft,
@@ -41,6 +42,7 @@ interface CalendarProps {
 }
 
 export default function CalendarScreen({ onBack }: CalendarProps = {}) {
+    const { t } = useTranslation();
     const navigation = useNavigation();
     const handleBack = onBack || (() => navigation.goBack());
     const { addMealPlan, deleteMealPlan, fetchAllMealPlans, fetchAllRecipes, confirmMealPlan, skipMealPlan } = usePantry();
@@ -91,9 +93,9 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
         })();
     }, []);
 
-    // ──────────────────────────────────────────────────────────────
+    // ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
     // Helpers
-    // ──────────────────────────────────────────────────────────────
+    // ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
     const formatDateString = (date: Date) =>
         `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
@@ -113,9 +115,9 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
         };
     };
 
-    // ──────────────────────────────────────────────────────────────
+    // ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
     // Calendar Header + Navigation
-    // ──────────────────────────────────────────────────────────────
+    // ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
     const monthNames = [
         'January',
         'February',
@@ -131,9 +133,9 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
         'December',
     ];
 
-    // ──────────────────────────────────────────────────────────────
+    // ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
     // Add Recipe Logic
-    // ──────────────────────────────────────────────────────────────
+    // ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
     const handleAddMeal = async () => {
         if (!selectedRecipeId) return;
 
@@ -199,11 +201,11 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                     .map((s) => `${s.name} (had ${s.available}${s.unit}, needed ${s.needed}${s.unit})`)
                     .join('\n');
                 Alert.alert(
-                    'Marked cooked — pantry shortfall',
+                    'Marked cooked � pantry shortfall',
                     `Pantry was updated (clamped at 0).\n\n${summary}\n\nYou can adjust stock in Pantry.`
                 );
             } else {
-                Alert.alert('Marked cooked', `${item.meal_name} — pantry updated.`);
+                Alert.alert('Marked cooked', `${item.meal_name} � pantry updated.`);
             }
         }
     };
@@ -214,17 +216,17 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
             setMealPlans((prev) =>
                 prev.map((mp) => (mp.id === item.id ? { ...mp, status: 'SKIPPED' } : mp))
             );
-            Alert.alert("Didn't cook", `${item.meal_name} — no pantry change.`);
+            Alert.alert("Didn't cook", `${item.meal_name} � no pantry change.`);
         }
     };
 
-    // ──────────────────────────────────────────────────────────────
+    // ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
     // Render
-    // ──────────────────────────────────────────────────────────────
+    // ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
     return (
         <View className="flex-1 bg-linen">
             <AppHeader
-                title="Cooking Calendar"
+                title={t('calendar.title')}
                 showBackButton
                 onBack={handleBack}
                 rightElement={<Plus size={24} color={colors.ink} />}
@@ -268,7 +270,7 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                     <View className="mb-4 bg-surface rounded-xl p-6 items-center border border-line">
                         <Text className="text-muted">No meals planned</Text>
                         <AskAiEmptyCta
-                            hint="Skip the forms — just tell the AI what you need."
+                            hint="Skip the forms � just tell the AI what you need."
                             label="Ask AI to plan this week"
                             onPress={() =>
                                 navigation.navigate(
@@ -486,7 +488,7 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                     </View>
                 )}
 
-                {/* ────────────── WEEK / LIST VIEW ────────────── */}
+                {/* ?�?�?�?�?�?�?�?�?�?�?�?�?�?� WEEK / LIST VIEW ?�?�?�?�?�?�?�?�?�?�?�?�?�?� */}
                 {viewMode === 'list' && (
                     <View className="mb-10">
                         {/* Week Navigation */}
@@ -532,7 +534,7 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                         </View>
 
                         <Text className="text-center font-semibold text-ink mb-4">
-                            {currentWeekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} —{' '}
+                            {currentWeekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ?�{' '}
                             {(() => {
                                 const end = new Date(currentWeekStart);
                                 end.setDate(currentWeekStart.getDate() + 6);
@@ -660,9 +662,9 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                 )}
             </ScrollView>
 
-            {/* ──────────────────────────────────────────────────────────────
+            {/* ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
           ADD RECIPE BOTTOM MODAL
-      ────────────────────────────────────────────────────────────── */}
+      ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?� */}
             <Modal
                 visible={showAddModal}
                 transparent

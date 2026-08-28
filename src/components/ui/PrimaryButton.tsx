@@ -14,6 +14,7 @@ type PrimaryButtonProps = {
   loading?: boolean;
   icon?: React.ReactNode;
   className?: string;
+  testID?: string;
 };
 
 export function PrimaryButton({
@@ -23,11 +24,13 @@ export function PrimaryButton({
   loading = false,
   icon,
   className = '',
+  testID,
 }: PrimaryButtonProps) {
   const isDisabled = disabled || loading;
 
   return (
     <TouchableOpacity
+      testID={testID}
       onPress={onPress}
       disabled={isDisabled}
       activeOpacity={0.85}

@@ -49,11 +49,11 @@ export const CARD_RESPONSE_TYPES: ChatResponseType[] = [
 
 export const chatApi = {
     send: (message: string, recipeContext?: ChatRequest['recipeContext']) =>
-        api.post<ChatResponseData>('/api/chat/send', { message, recipe_context: recipeContext }),
+        api.post<ChatResponseData>('chat/send', { message, recipe_context: recipeContext }),
 
-    getHistory: () => api.get<{ messages: HistoryMessage[] }>('/api/chat/history'),
+    getHistory: () => api.get<{ messages: HistoryMessage[] }>('chat/history'),
 
-    getActions: () => api.get<{ actions: string[]; description: string }>('/api/chat/actions'),
+    getActions: () => api.get<{ actions: string[]; description: string }>('chat/actions'),
 };
 
 export type { ApiResponse };
