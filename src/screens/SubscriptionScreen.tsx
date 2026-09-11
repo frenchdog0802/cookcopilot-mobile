@@ -8,10 +8,12 @@ import {
     Platform,
 } from 'react-native';
 import AppHeader from '../components/AppHeader';
+import { useTranslation } from 'react-i18next';
 import { useSubscription, getSubscriptionPeriodLabel } from '../services/iapService';
 import { colors } from '../theme/tokens';
 
 export default function SubscriptionScreen() {
+    const { t } = useTranslation();
     const {
         products,
         loading,
@@ -31,7 +33,7 @@ export default function SubscriptionScreen() {
     if (isPro) {
         return (
             <View className="flex-1 bg-linen">
-                <AppHeader title="Subscription" showBackButton />
+                <AppHeader title={t('nav.subscription')} showMenuButton />
                 <View className="flex-1 items-center justify-center p-6">
                     <Text className="text-4xl mb-4">✨</Text>
                     <Text className="text-2xl font-bold text-ink mb-2">
@@ -49,7 +51,7 @@ export default function SubscriptionScreen() {
 
     return (
         <View className="flex-1 bg-linen">
-            <AppHeader title="Upgrade to Pro" showBackButton />
+            <AppHeader title={t('nav.subscription')} showMenuButton />
 
             <ScrollView contentContainerStyle={{ padding: 16 }}>
                 <Text className="text-2xl font-bold text-center mb-2 text-ink">

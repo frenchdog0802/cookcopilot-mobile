@@ -24,6 +24,36 @@ jest.mock('@react-native-async-storage/async-storage', () =>
     require('@react-native-async-storage/async-storage/jest/async-storage-mock')
 );
 
+jest.mock('expo-secure-store', () => {
+    const store = new Map();
+    return {
+        __esModule: true,
+        __store: store,
+        setItemAsync: jest.fn(async (key, value) => {
+            store.set(key, value);
+        }),
+        getItemAsync: jest.fn(async (key) => (store.has(key) ? store.get(key) : null)),
+        deleteItemAsync: jest.fn(async (key) => {
+            store.delete(key);
+        }),
+    };
+});
+
+jest.mock('expo-secure-store', () => {
+    const store = new Map();
+    return {
+        __esModule: true,
+        setItemAsync: jest.fn(async (key, value) => {
+            store.set(key, value);
+        }),
+        getItemAsync: jest.fn(async (key) => (store.has(key) ? store.get(key) : null)),
+        deleteItemAsync: jest.fn(async (key) => {
+            store.delete(key);
+        }),
+        __reset: () => store.clear(),
+    };
+});
+
 jest.mock('react-native-worklets', () => ({
     __esModule: true,
     default: {},

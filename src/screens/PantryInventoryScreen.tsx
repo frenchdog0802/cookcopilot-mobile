@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
     View,
     Text,
@@ -16,21 +16,15 @@ import { usePantry } from '../contexts/pantryContext';
 import useSearchIngredients from '../hooks/useSearchIngredient';
 import { PantryItem } from '../types';
 import AppHeader from '../components/AppHeader';
-import AskAiEmptyCta from '../components/AskAiEmptyCta';
 import { UnitSelect, preferredUnitForIngredient } from '../components/UnitSelect';
 import { PantryItemRow } from '../components/pantry/PantryItemRow';
 import { SkeletonList } from '../components/ui/Skeleton';
 import type { MeasurementSystem } from '../utils/units';
-import { useNavigation } from '@react-navigation/native';
 import { colors } from '../theme/tokens';
+import { DRAW_DISTANCE } from '../constants/listPerf';
 
-interface PantryInventoryProps {
-    onBack?: () => void;
-}
-
-export default function PantryInventoryScreen({ onBack }: PantryInventoryProps = {}) {
+export default function PantryInventoryScreen() {
     const { t } = useTranslation();
-    const navigation = useNavigation();
     const {
         pantryItems: oriPantryItems,
         updatePantryItem,
@@ -43,13 +37,16 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
     } = usePantry();
 
     const measurementSystem = (userSettings.measurement_unit === 'imperial' ? 'imperial' : 'metric') as MeasurementSystem;
-    const [pantryItems, setPantryItems] = useState(oriPantryItems);
+    const pantryItems = useMemo(
+        () => (Array.isArray(oriPantryItems) ? oriPantryItems : []),
+        [oriPantryItems],
+    );
     const [searchQuery, setSearchQuery] = useState('');
     const [isAddingItem, setIsAddingItem] = useState(false);
     const [newItem, setNewItem] = useState({
         name: '',
         quantity: 1,
-        unit: '',
+        unit: 'pcs',
     });
     const [showDropdown, setShowDropdown] = useState(false);
     const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
@@ -59,11 +56,9 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
             await fetchAllPantryItems();
             setHasLoadedOnce(true);
         })();
-    }, [fetchAllPantryItems]);
-
-    useEffect(() => {
-        setPantryItems(Array.isArray(oriPantryItems) ? oriPantryItems : []);
-    }, [oriPantryItems]);
+        // Only load on mount; list updates flow through pantry context.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const { filteredIngredients, loading: searchLoading } = useSearchIngredients(
         newItem.name,
@@ -82,7 +77,7 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
 
     const showSkeleton = !hasLoadedOnce && loading && filteredItems.length === 0;
 
-    const handleAddItem = () => {
+    const handleAddItem = useCallback(() => {
         if (!newItem.name.trim()) return;
 
         const existing = pantryItems.find(
@@ -95,10 +90,10 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
             void addPantryItem(newItem);
         }
 
-        setNewItem({ name: '', quantity: 1, unit: '' });
+        setNewItem({ name: '', quantity: 1, unit: 'pcs' });
         setIsAddingItem(false);
         setShowDropdown(false);
-    };
+    }, [newItem, pantryItems, updatePantryItem, addPantryItem]);
 
     const handleUpdateQuantity = useCallback((item: PantryItem, delta: number) => {
         const next = item.quantity + delta;
@@ -120,7 +115,7 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
         />
     ), [measurementSystem, handleUpdateQuantity, handleRemove]);
 
-    const listHeader = (
+    const listHeader = useMemo(() => (
         <View className="pb-2">
             <View className="flex-row items-center bg-surface rounded-xl px-3 mb-4 border border-line">
                 <SearchIcon size={18} color={colors.muted} />
@@ -146,7 +141,7 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
                         placeholder="Item name"
                         value={newItem.name}
                         onChangeText={text => {
-                            setNewItem({ ...newItem, name: text });
+                            setNewItem((prev) => ({ ...prev, name: text }));
                             setShowDropdown(true);
                         }}
                         className="border border-line rounded-lg p-2 mb-2 bg-linen text-ink"
@@ -186,7 +181,7 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
                                 measurementSystem,
                             ).kind}
                             value={newItem.unit}
-                            onChange={unit => setNewItem({ ...newItem, unit })}
+                            onChange={unit => setNewItem((prev) => ({ ...prev, unit }))}
                             measurementSystem={measurementSystem}
                             preferSystemUnits
                         />
@@ -209,30 +204,28 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
                 </View>
             )}
         </View>
-    );
+    ), [
+        searchQuery,
+        isAddingItem,
+        newItem,
+        showDropdown,
+        searchLoading,
+        filteredIngredients,
+        ingredients,
+        measurementSystem,
+        handleAddItem,
+    ]);
 
-    const listEmpty = (
+    const listEmpty = useMemo(() => (
         <View className="bg-surface rounded-xl p-6 items-center border border-line">
             <PackageIcon size={32} color={colors.line} />
             <Text className="text-muted mt-2">No items found</Text>
-            {!searchQuery && (
-                <AskAiEmptyCta
-                    hint="Skip the forms ??just tell the AI what you need."
-                    label="Ask AI to update pantry"
-                    onPress={() =>
-                        navigation.navigate(
-                            'AICookingAssistant' as never,
-                            { initialPrompt: 'Add chicken, rice, and broccoli to my pantry' } as never,
-                        )
-                    }
-                />
-            )}
         </View>
-    );
+    ), []);
 
     return (
         <View className="flex-1 bg-linen">
-            <AppHeader title={t('pantry.title')} showBackButton onBack={onBack} />
+            <AppHeader title={t('pantry.title')} showMenuButton />
 
             <View className="flex-1 p-4">
                 {showSkeleton ? (
@@ -248,6 +241,7 @@ export default function PantryInventoryScreen({ onBack }: PantryInventoryProps =
                         ListHeaderComponent={listHeader}
                         ListEmptyComponent={listEmpty}
                         keyboardShouldPersistTaps="handled"
+                        drawDistance={DRAW_DISTANCE}
                     />
                 )}
             </View>

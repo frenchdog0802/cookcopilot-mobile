@@ -1,17 +1,17 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { View, Text, TouchableOpacity, TextInput } from 'react-native';
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useTranslation } from 'react-i18next';
 import { usePantry } from '../contexts/pantryContext';
 import { PlusIcon, CheckIcon, SearchIcon, XIcon } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import AppHeader from '../components/AppHeader';
-import AskAiEmptyCta from '../components/AskAiEmptyCta';
 import { UnitSelect, preferredUnitForIngredient } from '../components/UnitSelect';
 import { ShoppingListRow, type ShoppingListRowItem } from '../components/shopping/ShoppingListRow';
 import { SkeletonList } from '../components/ui/Skeleton';
 import type { MeasurementSystem } from '../utils/units';
 import { colors } from '../theme/tokens';
+import { DRAW_DISTANCE } from '../constants/listPerf';
 
 export default function ShoppingListScreen() {
     const { t } = useTranslation();
@@ -24,6 +24,7 @@ export default function ShoppingListScreen() {
         updateShoppingListItem,
         addShoppingListItem,
         removeShoppingListItem,
+        markAllShoppingListChecked,
         retryShoppingListSync,
         ingredients,
         userSettings,
@@ -31,7 +32,10 @@ export default function ShoppingListScreen() {
     } = usePantry();
 
     const measurementSystem = (userSettings.measurement_unit === 'imperial' ? 'imperial' : 'metric') as MeasurementSystem;
-    const [shoppingList, setShoppingList] = useState<ShoppingListRowItem[]>([]);
+    const shoppingList = useMemo(
+        () => (Array.isArray(oriShoppingList) ? oriShoppingList : []) as ShoppingListRowItem[],
+        [oriShoppingList],
+    );
     const [showMessage, setShowMessage] = useState(false);
     const [message, setMessage] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
@@ -41,21 +45,20 @@ export default function ShoppingListScreen() {
     const [newItem, setNewItem] = useState({
         name: '',
         quantity: '1',
-        unit: '',
+        unit: 'pcs',
     });
+    const listRef = useRef<FlashListRef<ShoppingListRowItem> | null>(null);
+    const shoppingListRef = useRef(shoppingList);
+    shoppingListRef.current = shoppingList;
 
     useEffect(() => {
         void (async () => {
             await fetchAllShoppingListItems();
             setHasLoadedOnce(true);
         })();
-    }, [fetchAllShoppingListItems]);
-
-    useEffect(() => {
-        if (Array.isArray(oriShoppingList)) {
-            setShoppingList(oriShoppingList as ShoppingListRowItem[]);
-        }
-    }, [oriShoppingList]);
+        // Only load on mount; list updates flow through pantry context.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const filteredItems = useMemo(() => {
         const list = Array.isArray(shoppingList) ? shoppingList : [];
@@ -69,22 +72,20 @@ export default function ShoppingListScreen() {
 
     const showSkeleton = !hasLoadedOnce && loading && filteredItems.length === 0;
 
-    const handleUpdateQuantity = useCallback(async (item: ShoppingListRowItem, delta: number) => {
-        const next = item.quantity + delta;
+    const handleUpdateQuantity = useCallback((item: ShoppingListRowItem, delta: number) => {
+        const current = shoppingListRef.current.find((i) => i.id === item.id) ?? item;
+        const next = current.quantity + delta;
         if (next >= 0) {
-            await updateShoppingListItem({ ...item, quantity: next });
+            void updateShoppingListItem({ ...current, quantity: next });
         }
     }, [updateShoppingListItem]);
 
-    const handleTogglePurchased = useCallback(async (id: string) => {
-        const item = shoppingList.find(i => i.id === id);
+    const handleTogglePurchased = useCallback((id: string) => {
+        const item = shoppingListRef.current.find((i) => i.id === id);
         if (item) {
-            await updateShoppingListItem({ ...item, checked: !item.checked });
-            setMessage('Item updated!');
-            setShowMessage(true);
-            setTimeout(() => setShowMessage(false), 2000);
+            void updateShoppingListItem({ ...item, checked: !item.checked });
         }
-    }, [shoppingList, updateShoppingListItem]);
+    }, [updateShoppingListItem]);
 
     const handleRemove = useCallback((id: string) => {
         void removeShoppingListItem(id);
@@ -101,16 +102,9 @@ export default function ShoppingListScreen() {
 
         setIsCompletingAll(true);
         try {
-            await Promise.all(
-                unchecked.map(item => updateShoppingListItem({ ...item, checked: true }))
-            );
-            setShoppingList(prevList =>
-                prevList.map(listItem =>
-                    listItem.checked ? listItem : { ...listItem, checked: true }
-                )
-            );
+            const count = await markAllShoppingListChecked();
             await fetchAllPantryItems();
-            setMessage(`All ${unchecked.length} item${unchecked.length === 1 ? '' : 's'} purchased!`);
+            setMessage(t('shopping.allPurchased', { count }));
             setShowMessage(true);
             setTimeout(() => setShowMessage(false), 2000);
         } finally {
@@ -124,15 +118,18 @@ export default function ShoppingListScreen() {
         await addShoppingListItem({
             name: newItem.name,
             quantity: parseFloat(newItem.quantity) || 1,
-            unit: newItem.unit,
+            unit: newItem.unit || 'pcs',
             checked: false,
         });
 
-        setNewItem({ name: '', quantity: '1', unit: '' });
+        setNewItem({ name: '', quantity: '1', unit: 'pcs' });
         setIsAddingItem(false);
-        setMessage('Item added to shopping list!');
+        setMessage(t('shopping.itemAdded'));
         setShowMessage(true);
         setTimeout(() => setShowMessage(false), 2000);
+        requestAnimationFrame(() => {
+            listRef.current?.scrollToOffset({ offset: 0, animated: true });
+        });
     };
 
     const renderItem = useCallback(({ item }: { item: ShoppingListRowItem }) => (
@@ -145,23 +142,25 @@ export default function ShoppingListScreen() {
         />
     ), [measurementSystem, handleTogglePurchased, handleUpdateQuantity, handleRemove]);
 
+    // Only surface problems â€” routine online sync stays invisible (like Pantry).
+    const showSyncBanner =
+        !shoppingListSyncStatus.isOnline ||
+        (Boolean(shoppingListSyncStatus.lastSyncError) &&
+            shoppingListSyncStatus.pendingCount > 0);
+
+    const syncBannerMessage = !shoppingListSyncStatus.isOnline
+        ? t('shopping.syncOffline')
+        : shoppingListSyncStatus.lastSyncError ?? t('shopping.syncPending', { count: shoppingListSyncStatus.pendingCount });
+
     return (
-        <View className="flex-1 bg-linen">
-            <AppHeader title={t('shopping.title')} showBackButton />
+        <View className="flex-1 bg-linen" testID="shopping-screen">
+            <AppHeader title={t('shopping.title')} showMenuButton />
 
             <View className="flex-1 p-4">
-                {(!shoppingListSyncStatus.isOnline ||
-                    shoppingListSyncStatus.pendingCount > 0 ||
-                    shoppingListSyncStatus.lastSyncError) && (
+                {showSyncBanner && (
                     <View className="mb-4 p-3 bg-sage border border-line rounded-xl">
                         <Text className="text-herb-deep text-sm font-medium">
-                            {!shoppingListSyncStatus.isOnline
-                                ? 'You?™re offline ??changes save on this device'
-                                : shoppingListSyncStatus.isSyncing
-                                  ? `Syncing ${shoppingListSyncStatus.pendingCount} change${shoppingListSyncStatus.pendingCount === 1 ? '' : 's'}?¦`
-                                  : shoppingListSyncStatus.lastSyncError
-                                    ? shoppingListSyncStatus.lastSyncError
-                                    : `${shoppingListSyncStatus.pendingCount} change${shoppingListSyncStatus.pendingCount === 1 ? '' : 's'} waiting to sync`}
+                            {syncBannerMessage}
                         </Text>
                         {shoppingListSyncStatus.isOnline &&
                             shoppingListSyncStatus.lastSyncError &&
@@ -170,7 +169,9 @@ export default function ShoppingListScreen() {
                                     onPress={() => void retryShoppingListSync()}
                                     className="mt-2 self-start bg-herb px-3 py-1.5 rounded-lg"
                                 >
-                                    <Text className="text-white text-sm font-medium">Retry sync</Text>
+                                    <Text className="text-white text-sm font-medium">
+                                        {t('shopping.syncRetry')}
+                                    </Text>
                                 </TouchableOpacity>
                             )}
                     </View>
@@ -187,7 +188,7 @@ export default function ShoppingListScreen() {
                         <SearchIcon size={18} color={colors.muted} />
                     </View>
                     <TextInput
-                        placeholder="Search shopping items..."
+                        placeholder={t('shopping.searchPlaceholder')}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                         className="w-full pl-10 pr-4 py-3 bg-surface rounded-xl border border-line text-ink"
@@ -196,23 +197,25 @@ export default function ShoppingListScreen() {
 
                 {!isAddingItem ? (
                     <TouchableOpacity
+                        testID="shopping-add-button"
                         onPress={() => setIsAddingItem(true)}
                         className="flex-row items-center justify-center bg-surface border border-line py-3 px-4 rounded-xl mb-4"
                     >
                         <PlusIcon size={18} color={colors.ink} />
-                        <Text className="text-ink font-medium ml-2">Add New Shopping Item</Text>
+                        <Text className="text-ink font-medium ml-2">{t('shopping.addItem')}</Text>
                     </TouchableOpacity>
                 ) : (
                     <View className="bg-surface p-4 rounded-xl border border-line mb-4">
                         <View className="flex-row justify-between items-center mb-3">
-                            <Text className="font-medium text-ink">Add Item to Shopping List</Text>
+                            <Text className="font-medium text-ink">{t('shopping.addItemTitle')}</Text>
                             <TouchableOpacity onPress={() => setIsAddingItem(false)}>
                                 <XIcon size={20} color={colors.muted} />
                             </TouchableOpacity>
                         </View>
 
                         <TextInput
-                            placeholder="Item name"
+                            testID="shopping-item-name"
+                            placeholder={t('shopping.itemNamePlaceholder')}
                             value={newItem.name}
                             onChangeText={(text) => setNewItem({ ...newItem, name: text })}
                             className="w-full p-3 border border-line rounded-lg mb-3 bg-linen text-ink"
@@ -220,7 +223,7 @@ export default function ShoppingListScreen() {
 
                         <View className="flex-row gap-2 mb-3">
                             <TextInput
-                                placeholder="Qty"
+                                placeholder={t('pantry.quantity')}
                                 value={newItem.quantity}
                                 onChangeText={(text) => setNewItem({ ...newItem, quantity: text })}
                                 keyboardType="numeric"
@@ -229,7 +232,7 @@ export default function ShoppingListScreen() {
                             <View className="flex-[2]">
                                 <UnitSelect
                                     kind={preferredUnitForIngredient(
-                                        ingredients.find(i => i.name.toLowerCase() === newItem.name.toLowerCase()) || {
+                                        (Array.isArray(ingredients) ? ingredients : []).find(i => i.name.toLowerCase() === newItem.name.toLowerCase()) || {
                                             default_unit: newItem.unit,
                                         },
                                         measurementSystem,
@@ -245,18 +248,19 @@ export default function ShoppingListScreen() {
                         <View className="flex-row gap-2">
                             <TouchableOpacity
                                 onPress={() => {
-                                    setNewItem({ name: '', quantity: '1', unit: '' });
+                                    setNewItem({ name: '', quantity: '1', unit: 'pcs' });
                                     setIsAddingItem(false);
                                 }}
                                 className="flex-1 bg-linen border border-line py-3 rounded-lg"
                             >
-                                <Text className="text-ink text-center font-medium">Cancel</Text>
+                                <Text className="text-ink text-center font-medium">{t('common.cancel')}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
+                                testID="shopping-save-item"
                                 onPress={handleAddItem}
                                 className="flex-1 bg-herb py-3 rounded-lg"
                             >
-                                <Text className="text-white text-center font-medium">Add Item</Text>
+                                <Text className="text-white text-center font-medium">{t('common.add')}</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -264,7 +268,7 @@ export default function ShoppingListScreen() {
 
                 <View className="bg-surface rounded-xl overflow-hidden flex-1 border border-line">
                     <View className="p-4 border-b border-line bg-linen flex-row items-center justify-between">
-                        <Text className="font-semibold text-ink">Items to Buy</Text>
+                        <Text className="font-semibold text-ink">{t('shopping.itemsToBuy')}</Text>
                         <TouchableOpacity
                             onPress={handleCompleteAll}
                             disabled={uncheckedCount === 0 || isCompletingAll}
@@ -281,7 +285,7 @@ export default function ShoppingListScreen() {
                                     uncheckedCount === 0 || isCompletingAll ? 'text-muted' : 'text-white'
                                 }`}
                             >
-                                {isCompletingAll ? 'Completing...' : 'Complete all'}
+                                {isCompletingAll ? t('shopping.completing') : t('shopping.completeAll')}
                             </Text>
                         </TouchableOpacity>
                     </View>
@@ -290,28 +294,19 @@ export default function ShoppingListScreen() {
                         <SkeletonList count={5} />
                     ) : filteredItems.length === 0 ? (
                         <View className="p-6 items-center">
-                            <Text className="text-muted">No items in your shopping list</Text>
+                            <Text className="text-muted">{t('shopping.empty')}</Text>
                             {searchQuery ? (
-                                <Text className="text-muted text-sm mt-1">Try a different search term</Text>
-                            ) : (
-                                <AskAiEmptyCta
-                                    hint="Skip the forms ??just tell the AI what you need."
-                                    label="Ask AI to build a list"
-                                    onPress={() =>
-                                        navigation.navigate(
-                                            'AICookingAssistant' as never,
-                                            { initialPrompt: 'Add milk, eggs, and bread to my shopping list' } as never,
-                                        )
-                                    }
-                                />
-                            )}
+                                <Text className="text-muted text-sm mt-1">{t('common.tryDifferentSearch')}</Text>
+                            ) : null}
                         </View>
                     ) : (
                         <FlashList
+                            ref={listRef}
                             data={filteredItems}
                             renderItem={renderItem}
                             keyExtractor={(item) => item.id.toString()}
                             contentContainerStyle={{ padding: 12 }}
+                            drawDistance={DRAW_DISTANCE}
                         />
                     )}
                 </View>

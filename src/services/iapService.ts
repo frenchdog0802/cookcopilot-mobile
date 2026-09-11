@@ -10,7 +10,7 @@ import { subscriptionApi } from '../api/subscription';
 
 export const PRODUCT_IDS = {
     ios: ['com.lardermind.pro.monthly', 'com.lardermind.pro.yearly'],
-    android: ['pantry_pro_monthly', 'pantry_pro_yearly'],
+    android: ['com.lardermind.pro.monthly', 'com.lardermind.pro.yearly'],
 };
 
 export function getProductIds(): string[] {
@@ -44,7 +44,7 @@ const MOCK_PRODUCTS: IAPProduct[] = [
     {
         productId: 'com.lardermind.pro.yearly',
         title: 'Pro Yearly',
-        description: 'Best value — save about 33% vs monthly',
+        description: 'Best value - save about 33% vs monthly',
         price: '39.99',
         currency: 'USD',
         localizedPrice: '$39.99',

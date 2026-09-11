@@ -9,29 +9,83 @@ type PantryItemDto = {
 
 function fromDto(dto: PantryItemDto): PantryItem {
     const details = dto.details ?? {};
+    const flat = dto as PantryItemDto & Partial<PantryItem>;
     return {
-        id: String(dto.id ?? details.id ?? ''),
-        name: String(dto.name ?? details.name ?? ''),
-        quantity: Number(details.quantity ?? 0),
-        unit: String(details.unit ?? ''),
-        item_planned: details.item_planned != null ? Number(details.item_planned) : undefined,
-        item_to_buy: details.item_to_buy != null ? Number(details.item_to_buy) : undefined,
+        id: String(flat.id ?? details.id ?? ''),
+        name: String(flat.name ?? details.name ?? ''),
+        quantity: Number(flat.quantity ?? details.quantity ?? 0),
+        unit: String(flat.unit ?? details.unit ?? ''),
+        ingredient_id:
+            flat.ingredient_id != null
+                ? String(flat.ingredient_id)
+                : details.ingredient_id != null
+                  ? String(details.ingredient_id)
+                  : undefined,
+        unit_kind:
+            flat.unit_kind != null
+                ? String(flat.unit_kind)
+                : details.unit_kind != null
+                  ? String(details.unit_kind)
+                  : undefined,
+        base_unit:
+            flat.base_unit != null
+                ? String(flat.base_unit)
+                : details.base_unit != null
+                  ? String(details.base_unit)
+                  : undefined,
+        default_display_unit:
+            flat.default_display_unit != null
+                ? String(flat.default_display_unit)
+                : details.default_display_unit != null
+                  ? String(details.default_display_unit)
+                  : undefined,
+        item_planned:
+            flat.item_planned != null
+                ? Number(flat.item_planned)
+                : details.item_planned != null
+                  ? Number(details.item_planned)
+                  : undefined,
+        item_to_buy:
+            flat.item_to_buy != null
+                ? Number(flat.item_to_buy)
+                : details.item_to_buy != null
+                  ? Number(details.item_to_buy)
+                  : undefined,
     };
 }
 
+/**
+ * Dual-backend payload:
+ * - Nest expects flat { name|ingredient_id, quantity, unit }
+ * - Spring expects { name, details: { quantity, unit } }
+ */
 function toCreatePayload(data: Partial<PantryItem>) {
-    const { name, id: _id, ...rest } = data;
+    const { name, id: _id, quantity, unit, ingredient_id, ...rest } = data;
     return {
         name: name ?? '',
-        details: rest,
+        ingredient_id,
+        quantity,
+        unit,
+        details: {
+            quantity,
+            unit,
+            ingredient_id,
+            ...rest,
+        },
     };
 }
 
 function toUpdatePayload(data: Partial<PantryItem>) {
-    const { name, id: _id, ...rest } = data;
+    const { name, id: _id, quantity, unit, ...rest } = data;
     return {
         ...(name != null ? { name } : {}),
-        details: rest,
+        quantity,
+        unit,
+        details: {
+            quantity,
+            unit,
+            ...rest,
+        },
     };
 }
 
@@ -71,10 +125,18 @@ export const pantryItemApi = {
 
     updateMany: (items: Array<Pick<PantryItem, 'id'> & Partial<PantryItem>>): Promise<ApiResponse<unknown>> =>
         api.put<unknown>('pantry-item/bulk', {
-            items: items.map(({ id, name, ...rest }) => ({
+            items: items.map(({ id, name, quantity, unit, ingredient_id, ...rest }) => ({
                 id,
                 ...(name != null ? { name } : {}),
-                details: rest,
+                quantity,
+                unit,
+                ingredient_id,
+                details: {
+                    quantity,
+                    unit,
+                    ingredient_id,
+                    ...rest,
+                },
             })),
         }),
 

@@ -3,12 +3,12 @@ import './src/i18n';
 import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { createDrawerNavigator } from '@react-navigation/drawer';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { useTranslation } from 'react-i18next';
-import { buildTabBarStyle } from './src/navigation/tabBarStyle';
 import {
   Fraunces_400Regular,
   Fraunces_500Medium,
@@ -22,34 +22,19 @@ import {
   SourceSans3_600SemiBold,
   SourceSans3_700Bold,
 } from '@expo-google-fonts/source-sans-3';
-import {
-  House as HouseIcon,
-  Calendar as CalendarIcon,
-  Package as PackageIcon,
-  ShoppingCart as ShoppingCartIcon,
-  Utensils as UtensilsIcon,
-  Settings as SettingsIcon,
-} from 'lucide-react-native';
 
 import LoadingScreen from './src/screens/LoadingScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import SignUpScreen from './src/screens/SignUpScreen';
-import HomeScreen from './src/screens/HomeScreen';
-import CalendarScreen from './src/screens/CalendarScreen';
-import PantryInventoryScreen from './src/screens/PantryInventoryScreen';
-import ShoppingListScreen from './src/screens/ShoppingListScreen';
-import RecipeManagerScreen from './src/screens/RecipeManagerScreen';
-import SettingsScreen from './src/screens/SettingsScreen';
-import AICookingAssistantScreen from './src/screens/AICookingAssistantScreen';
-import SubscriptionScreen from './src/screens/SubscriptionScreen';
+import AppDrawerContent from './src/navigation/AppDrawerContent';
+import { colors } from './src/theme/tokens';
 
 import { AuthProvider, useAuth } from './src/contexts/authContext';
 import { PantryProvider } from './src/contexts/pantryContext';
-import { colors } from './src/theme/tokens';
 import { initI18n } from './src/i18n';
 
 const Stack = createStackNavigator();
-const Tab = createBottomTabNavigator();
+const Drawer = createDrawerNavigator();
 
 function AuthCheck({ children }: { children: React.ReactNode }) {
   const { initializing } = useAuth();
@@ -63,24 +48,11 @@ function AuthCheck({ children }: { children: React.ReactNode }) {
 
 function RootNavigator() {
   const { isAuthenticated } = useAuth();
-  const { t } = useTranslation();
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {isAuthenticated ? (
-        <>
-          <Stack.Screen name="Main" component={MainTabs} />
-          <Stack.Screen
-            name="AICookingAssistant"
-            component={AICookingAssistantScreen}
-            options={{ title: t('ai.title') }}
-          />
-          <Stack.Screen
-            name="Subscription"
-            component={SubscriptionScreen}
-            options={{ title: 'Subscription' }}
-          />
-        </>
+        <Stack.Screen name="Main" component={MainDrawer} />
       ) : (
         <Stack.Screen name="Auth" component={AuthStack} />
       )}
@@ -97,69 +69,61 @@ function AuthStack() {
   );
 }
 
-function MainTabs() {
+function MainDrawer() {
   const { t } = useTranslation();
-  const insets = useSafeAreaInsets();
 
   return (
-    <Tab.Navigator
+    <Drawer.Navigator
+      initialRouteName="Chat"
+      drawerContent={(props) => <AppDrawerContent {...props} />}
       screenOptions={{
-        tabBarActiveTintColor: colors.herb,
-        tabBarInactiveTintColor: colors.muted,
-        tabBarStyle: buildTabBarStyle(insets.bottom, colors),
         headerShown: false,
+        lazy: true,
+        drawerType: 'front',
+        swipeEdgeWidth: 28,
+        overlayColor: 'rgba(31, 36, 32, 0.35)',
+        drawerStyle: {
+          backgroundColor: colors.linen,
+          width: 304,
+        },
       }}
     >
-      <Tab.Screen
-        name="HomeTab"
-        component={HomeScreen}
-        options={{
-          tabBarLabel: t('nav.home'),
-          tabBarIcon: ({ color, size }) => <HouseIcon size={size} color={color} />,
-        }}
+      <Drawer.Screen
+        name="Chat"
+        getComponent={() => require('./src/screens/AICookingAssistantScreen').default}
+        options={{ title: t('ai.title'), drawerItemStyle: { display: 'none' } }}
       />
-      <Tab.Screen
-        name="CalendarTab"
-        component={CalendarScreen}
-        options={{
-          tabBarLabel: t('nav.calendar'),
-          tabBarIcon: ({ color, size }) => <CalendarIcon size={size} color={color} />,
-        }}
+      <Drawer.Screen
+        name="Calendar"
+        getComponent={() => require('./src/screens/CalendarScreen').default}
+        options={{ title: t('nav.calendar'), drawerItemStyle: { display: 'none' } }}
       />
-      <Tab.Screen
-        name="PantryTab"
-        component={PantryInventoryScreen}
-        options={{
-          tabBarLabel: t('nav.pantry'),
-          tabBarIcon: ({ color, size }) => <PackageIcon size={size} color={color} />,
-        }}
+      <Drawer.Screen
+        name="Inventory"
+        getComponent={() => require('./src/screens/PantryInventoryScreen').default}
+        options={{ title: t('nav.inventory'), drawerItemStyle: { display: 'none' } }}
       />
-      <Tab.Screen
-        name="ShoppingTab"
-        component={ShoppingListScreen}
-        options={{
-          tabBarLabel: t('nav.shopping'),
-          tabBarIcon: ({ color, size }) => <ShoppingCartIcon size={size} color={color} />,
-        }}
+      <Drawer.Screen
+        name="Shopping"
+        getComponent={() => require('./src/screens/ShoppingListScreen').default}
+        options={{ title: t('nav.shopping'), drawerItemStyle: { display: 'none' } }}
       />
-      <Tab.Screen
-        name="RecipesTab"
-        component={RecipeManagerScreen}
-        options={{
-          tabBarLabel: t('nav.recipes'),
-          tabBarIcon: ({ color, size }) => <UtensilsIcon size={size} color={color} />,
-        }}
+      <Drawer.Screen
+        name="Recipes"
+        getComponent={() => require('./src/screens/RecipeManagerScreen').default}
+        options={{ title: t('nav.recipes'), drawerItemStyle: { display: 'none' } }}
       />
-      <Tab.Screen
-        name="SettingsTab"
-        component={SettingsScreen}
-        options={{
-          tabBarButtonTestID: 'tab-settings',
-          tabBarLabel: t('nav.settings'),
-          tabBarIcon: ({ color, size }) => <SettingsIcon size={size} color={color} />,
-        }}
+      <Drawer.Screen
+        name="Settings"
+        getComponent={() => require('./src/screens/SettingsScreen').default}
+        options={{ title: t('nav.settings'), drawerItemStyle: { display: 'none' } }}
       />
-    </Tab.Navigator>
+      <Drawer.Screen
+        name="Subscription"
+        getComponent={() => require('./src/screens/SubscriptionScreen').default}
+        options={{ title: t('nav.subscription'), drawerItemStyle: { display: 'none' } }}
+      />
+    </Drawer.Navigator>
   );
 }
 
@@ -183,25 +147,29 @@ function App() {
 
   if ((!fontsLoaded && !fontError) || !i18nReady) {
     return (
-      <SafeAreaProvider>
-        <LoadingScreen fullScreen />
-      </SafeAreaProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <LoadingScreen fullScreen />
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
     );
   }
 
   return (
-    <SafeAreaProvider>
-      <AuthProvider>
-        <PantryProvider>
-          <NavigationContainer>
-            <StatusBar style="dark" />
-            <AuthCheck>
-              <RootNavigator />
-            </AuthCheck>
-          </NavigationContainer>
-        </PantryProvider>
-      </AuthProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <AuthProvider>
+          <PantryProvider>
+            <NavigationContainer>
+              <StatusBar style="dark" />
+              <AuthCheck>
+                <RootNavigator />
+              </AuthCheck>
+            </NavigationContainer>
+          </PantryProvider>
+        </AuthProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 

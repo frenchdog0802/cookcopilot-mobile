@@ -1,5 +1,5 @@
-import React, { memo } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import React, { memo, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, ActivityIndicator, Animated } from 'react-native';
 import ChatMessageContent from '../ChatMessageContent';
 import type { ChatResponseType } from '../../api/chat';
 import { colors } from '../../theme/tokens';
@@ -32,6 +32,8 @@ export type ChatMessageItem = {
   type?: ChatResponseType;
   cardData?: ChatCardData;
   timestamp: number;
+  streaming?: boolean;
+  statusText?: string;
 };
 
 type ChatMessageRowProps = {
@@ -44,6 +46,34 @@ type ChatMessageRowProps = {
   onViewPantry: () => void;
 };
 
+function StreamingCaret() {
+  const opacity = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 0.2, duration: 450, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 1, duration: 450, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [opacity]);
+
+  return (
+    <Animated.View
+      style={{
+        opacity,
+        width: 2,
+        height: 16,
+        marginLeft: 2,
+        marginBottom: 2,
+        backgroundColor: colors.herb,
+        alignSelf: 'flex-end',
+      }}
+    />
+  );
+}
+
 function ChatMessageRowComponent({
   item,
   addingToMenuRecipeId,
@@ -54,6 +84,7 @@ function ChatMessageRowComponent({
   onViewPantry,
 }: ChatMessageRowProps) {
   const isUser = item.role === 'user';
+  const showStreamingPlaceholder = Boolean(item.streaming && !item.content);
 
   return (
     <View className={`mb-4 ${isUser ? 'items-end' : 'items-start'}`}>
@@ -66,11 +97,30 @@ function ChatMessageRowComponent({
               : 'bg-surface border border-line'
         }`}
       >
-        <ChatMessageContent
-          content={item.content}
-          isUser={isUser}
-          style={item.type === 'error' && !isUser ? { color: colors.danger } : undefined}
-        />
+        {showStreamingPlaceholder ? (
+          <View className="gap-2">
+            <View className="flex-row items-center gap-2 py-1">
+              <ActivityIndicator size="small" color={colors.herb} />
+              <Text className="text-muted text-sm">{item.statusText || 'Thinking…'}</Text>
+            </View>
+          </View>
+        ) : (
+          <View>
+            <View className="flex-row flex-wrap items-end">
+              <View className="flex-shrink">
+                <ChatMessageContent
+                  content={item.content}
+                  isUser={isUser}
+                  style={item.type === 'error' && !isUser ? { color: colors.danger } : undefined}
+                />
+              </View>
+              {item.streaming ? <StreamingCaret /> : null}
+            </View>
+            {item.streaming && item.statusText ? (
+              <Text className="mt-2 text-xs text-muted">{item.statusText}</Text>
+            ) : null}
+          </View>
+        )}
 
         {(item.type === 'recipe_created' || item.type === 'recipe_imported') && item.cardData ? (
           <View className="mt-3 bg-linen rounded-xl p-4 border border-line">
@@ -151,7 +201,7 @@ function ChatMessageRowComponent({
             <Text className="font-medium text-ink mb-2">
               {item.cardData.mealsScheduled
                 ? `Scheduled ${item.cardData.mealsScheduled} meal(s)`
-                : `${item.cardData.recipeName} — ${item.cardData.mealType} on ${item.cardData.servingDate}`}
+                : `${item.cardData.recipeName} - ${item.cardData.mealType} on ${item.cardData.servingDate}`}
             </Text>
             <TouchableOpacity
               onPress={onViewCalendar}
@@ -166,7 +216,7 @@ function ChatMessageRowComponent({
           <View className="mt-3 bg-linen rounded-xl p-4 border border-line">
             <Text className="font-medium text-ink mb-2">
               {item.cardData.removedDuplicates != null
-                ? `Pantry organized — merged ${item.cardData.mergedGroups ?? 0} group(s)`
+                ? `Pantry organized - merged ${item.cardData.mergedGroups ?? 0} group(s)`
                 : `Added ${item.cardData.itemsAdded ?? 0} item(s) to pantry`}
             </Text>
             <TouchableOpacity onPress={onViewPantry} className="bg-herb py-2 rounded-lg items-center">
@@ -180,7 +230,7 @@ function ChatMessageRowComponent({
             <Text className="font-medium text-ink mb-2">Meal suggestions</Text>
             {(item.cardData.suggestions ?? []).map((s, index) => (
               <Text key={index} className="text-sm text-muted">
-                {s.recipeName} — {s.matchScore}% match
+                {s.recipeName} - {s.matchScore}% match
               </Text>
             ))}
             <TouchableOpacity

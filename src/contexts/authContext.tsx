@@ -1,10 +1,11 @@
-import React, { useEffect, useState, createContext, useContext } from 'react';
+import React, { useEffect, useState, createContext, useContext, useCallback, useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth } from '../api/api-auth';
-import { authHelper } from '../api/auth-helper';
+import { authHelper, isJwtExpired } from '../api/auth-helper';
+import { setUnauthorizedHandler } from '../api/client';
 import { User } from '../types';
 
-import { clearUserOfflineData } from '../services/shoppingListOffline';
+import { clearUserOfflineData, clearBackoff } from '../services/shoppingListOffline';
 
 export interface AuthResponse {
     success: boolean;
@@ -31,6 +32,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [user, setUser] = useState<User | null>(null);
     const [initializing, setInitializing] = useState(true);
     const [submitting, setSubmitting] = useState(false);
+    const userRef = useRef<User | null>(null);
+    userRef.current = user;
+
+    const logout = useCallback(async (): Promise<void> => {
+        const previousUserId = userRef.current?.id;
+        setUser(null);
+        await authHelper.clearJWT();
+        await AsyncStorage.removeItem('user');
+        if (previousUserId) {
+            clearBackoff(previousUserId);
+            await clearUserOfflineData(previousUserId);
+        }
+    }, []);
+
+    useEffect(() => {
+        setUnauthorizedHandler(() => {
+            void logout();
+        });
+        return () => {
+            setUnauthorizedHandler(null);
+        };
+    }, [logout]);
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -39,23 +62,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 const jwtToken = await authHelper.getJWT();
 
                 if (storedUser && jwtToken) {
-                    const parsedUser = JSON.parse(storedUser) as User;
-                    if (parsedUser && parsedUser.name && parsedUser.id) {
-                        setUser(parsedUser);
-                    } else {
-                        console.warn('Incomplete user data, clearing...');
+                    if (isJwtExpired(jwtToken)) {
+                        await authHelper.clearJWT();
                         await AsyncStorage.removeItem('user');
+                    } else {
+                        const parsedUser = JSON.parse(storedUser) as User;
+                        if (parsedUser && parsedUser.name && parsedUser.id) {
+                            setUser(parsedUser);
+                        } else {
+                            console.warn('Incomplete user data, clearing...');
+                            await AsyncStorage.removeItem('user');
+                            await authHelper.clearJWT();
+                        }
                     }
                 }
             } catch (error) {
                 console.error('Auth check error:', error);
                 await AsyncStorage.removeItem('user');
+                await authHelper.clearJWT();
             } finally {
                 setInitializing(false);
             }
         };
 
-        checkAuth();
+        void checkAuth();
     }, []);
 
     const signUp = async (userData: User, password: string): Promise<AuthResponse> => {
@@ -63,9 +93,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const authResponse: AuthResponse = { success: false };
 
         try {
-            console.log('[auth] signup start', userData.email);
+            if (__DEV__) {
+                console.log('[auth] signup start', userData.email);
+            }
             const response = await auth.signup(userData, password);
-            console.log('[auth] signup response', response?.success, response?.message);
+            if (__DEV__) {
+                console.log('[auth] signup response', response?.success, response?.message);
+            }
 
             if (response && response.success && response.data) {
                 const createdUser = response.data.user;
@@ -92,9 +126,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const authResponse: AuthResponse = { success: false };
 
         try {
-            console.log('[auth] login start', email);
+            if (__DEV__) {
+                console.log('[auth] login start', email);
+            }
             const response = await auth.signin(email, password);
-            console.log('[auth] login response', response?.success, response?.message);
+            if (__DEV__) {
+                console.log('[auth] login response', response?.success, response?.message);
+            }
 
             if (response && response.data && response.success) {
                 await authHelper.authenticate(response.data.token);
@@ -115,26 +153,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return authResponse;
     };
 
-    const logout = async (): Promise<void> => {
-        const previousUserId = user?.id;
-        setUser(null);
-        await authHelper.clearJWT();
-        await AsyncStorage.removeItem('user');
-        if (previousUserId) {
-            await clearUserOfflineData(previousUserId);
-        }
-    };
-
-    const value = {
-        user,
-        initializing,
-        submitting,
-        loading: initializing,
-        login,
-        logout,
-        isAuthenticated: !!user,
-        signUp,
-    };
+    const value = useMemo(
+        () => ({
+            user,
+            initializing,
+            submitting,
+            loading: initializing,
+            login,
+            logout,
+            isAuthenticated: !!user,
+            signUp,
+        }),
+        [user, initializing, submitting, logout],
+    );
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

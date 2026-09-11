@@ -4,7 +4,7 @@
  * This screen manages recipes and folders with full CRUD operations
  * connected to the backend API.
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     View,
     Text,
@@ -32,63 +32,33 @@ import {
     CameraIcon,
     ImageIcon,
 } from 'lucide-react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import AppHeader from '../components/AppHeader';
-import AskAiEmptyCta from '../components/AskAiEmptyCta';
-import { UnitSelect, QuantityLabel, preferredUnitForIngredient } from '../components/UnitSelect';
+import { QuantityLabel } from '../components/UnitSelect';
 import type { MeasurementSystem } from '../utils/units';
+import { kindOf } from '../utils/units';
 
-// API imports
-import { recipeApi } from '../api/recipe';
-import { folderApi } from '../api/folder';
-import { Recipe, Folder, ApiResponse } from '../types';
+import { Recipe, Folder } from '../types';
 import { normalizeRecipe, usePantry } from '../contexts/pantryContext';
 import { CachedImage } from '../components/ui/CachedImage';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { FolderRow, RecipeRow } from '../components/recipes/RecipeListRows';
+import {
+    RecipeIngredientRow,
+    type RecipeIngredient,
+} from '../components/recipes/RecipeIngredientRow';
+import { DRAW_DISTANCE } from '../constants/listPerf';
 import { colors } from '../theme/tokens';
-
-function unwrapListResponse<T>(data: T[] | Record<string, T[] | undefined>, key: string): T[] {
-    if (Array.isArray(data)) return data;
-    const list = data[key];
-    return Array.isArray(list) ? list : [];
-}
-
-function unwrapEntityResponse<T>(
-    data: T | Record<string, T | undefined> | undefined,
-    key: string,
-): T | null {
-    if (!data || typeof data !== 'object') return null;
-    if ('id' in data && (data as { id?: unknown }).id != null) {
-        return data as T;
-    }
-    const nested = (data as Record<string, T | undefined>)[key];
-    return nested ?? null;
-}
-
-function serializeRecipePayload(recipe: Partial<Recipe>): Record<string, unknown> {
-    const instructions = recipe.instructions;
-    return {
-        ...recipe,
-        instructions: Array.isArray(instructions)
-            ? instructions.filter(Boolean).join('\n')
-            : instructions ?? '',
-        image: recipe.image?.url ? recipe.image : null,
-    };
-}
+import {
+    applyCatalogIngredient,
+    createEmptyRecipeForm,
+    findCatalogIngredient,
+} from '../utils/recipePayload';
 
 // ============================================================================
 // TYPES (Local interfaces for component state)
 // ============================================================================
-interface Ingredient {
-    name: string;
-    quantity: number;
-    unit: string;
-    unit_kind?: string;
-    base_unit?: string;
-    default_display_unit?: string;
-}
 
 // Default folders that always exist (created on backend if not present)
 const DEFAULT_FOLDER_NAMES = ['Uncategorized', 'Favorites', 'Breakfast', 'Lunch', 'Dinner'];
@@ -98,19 +68,29 @@ export default function RecipeManagerScreen() {
     const navigation = useNavigation();
     const route = useRoute();
     const recipeIdParam = (route.params as { recipeId?: string } | undefined)?.recipeId;
-    const { userSettings } = usePantry();
+    const {
+        recipes,
+        folders,
+        ingredients,
+        fetchAllRecipes,
+        fetchAllFolders,
+        fetchAllIngredients,
+        addRecipe,
+        updateRecipe,
+        deleteRecipe,
+        addFolder,
+        updateFolder,
+        deleteFolder,
+        userSettings,
+        loading,
+        loadingByResource,
+    } = usePantry();
     const measurementSystem = (userSettings.measurement_unit === 'imperial' ? 'imperial' : 'metric') as MeasurementSystem;
 
     // ========================================================================
-    // STATE - Data from API
+    // STATE - Loading and Error (lists live in pantryContext)
     // ========================================================================
-    const [folders, setFolders] = useState<Folder[]>([]);
-    const [recipes, setRecipes] = useState<Recipe[]>([]);
-
-    // ========================================================================
-    // STATE - Loading and Error
-    // ========================================================================
-    const [loading, setLoading] = useState(true);
+    const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -137,89 +117,49 @@ export default function RecipeManagerScreen() {
     // ========================================================================
     // STATE - New/Edit Recipe Form
     // ========================================================================
-    const [newRecipe, setNewRecipe] = useState<Partial<Recipe>>({
-        meal_name: '',
-        ingredients: [{ name: '', quantity: 1, unit: '' }],
-        image: null,
-        folder_id: '',
-        instructions: [],
-    });
+    const [newRecipe, setNewRecipe] = useState<Partial<Recipe>>(createEmptyRecipeForm());
+
+    const openAddRecipeForm = useCallback((folderId = '') => {
+        setSelectedRecipe(null);
+        setIsEditing(false);
+        setNewRecipe(createEmptyRecipeForm(folderId));
+        setShowAddRecipe(true);
+        void fetchAllIngredients();
+        if (folderId) {
+            setCurrentFolder((prev) => {
+                if (prev?.id === folderId) return prev;
+                return folders.find((f) => f.id === folderId) ?? prev;
+            });
+        }
+    }, [folders, fetchAllIngredients]);
 
     // ========================================================================
-    // API CALLS - Fetch Data
+    // DATA - Refetch via pantryContext
     // ========================================================================
 
-    /**
-     * Fetch all folders from the backend
-     */
-    const fetchFolders = useCallback(async () => {
-        try {
-            const response = await folderApi.list();
-            if (response.success && response.data) {
-                setFolders(
-                    unwrapListResponse(
-                        response.data as Folder[] | { folders?: Folder[] },
-                        'folders',
-                    ),
-                );
-            } else {
-                console.error('[RecipeManager] Failed to fetch folders:', response.message);
-            }
-        } catch (err) {
-            console.error('[RecipeManager] Error fetching folders:', err);
-        }
-    }, []);
-
-    /**
-     * Fetch all recipes from the backend
-     */
-    const fetchRecipes = useCallback(async () => {
-        try {
-            const response = await recipeApi.list();
-            if (response.success && response.data) {
-                const data = response.data as Recipe[] | { recipes?: Recipe[] };
-                setRecipes(
-                    unwrapListResponse(data, 'recipes').map((recipe) =>
-                        normalizeRecipe(recipe as unknown as Record<string, unknown>)
-                    )
-                );
-            } else {
-                console.error('[RecipeManager] Failed to fetch recipes:', response.message);
-            }
-        } catch (err) {
-            console.error('[RecipeManager] Error fetching recipes:', err);
-        }
-    }, []);
-
-    /**
-     * Initial data load
-     */
     const loadData = useCallback(async () => {
-        setLoading(true);
         setError(null);
         try {
-            await Promise.all([fetchFolders(), fetchRecipes()]);
+            await Promise.all([fetchAllFolders(), fetchAllRecipes(), fetchAllIngredients()]);
         } catch (err) {
             setError('Failed to load data. Please try again.');
             console.error('[RecipeManager] Load error:', err);
         } finally {
-            setLoading(false);
+            setHasLoadedOnce(true);
         }
-    }, [fetchFolders, fetchRecipes]);
+    }, [fetchAllFolders, fetchAllRecipes, fetchAllIngredients]);
 
-    /**
-     * Pull-to-refresh handler
-     */
     const handleRefresh = useCallback(async () => {
         setRefreshing(true);
         await loadData();
         setRefreshing(false);
     }, [loadData]);
 
-    // Load data on mount
-    useEffect(() => {
-        loadData();
-    }, [loadData]);
+    useFocusEffect(
+        useCallback(() => {
+            void loadData();
+        }, [loadData]),
+    );
 
     useEffect(() => {
         if (!recipeIdParam || recipes.length === 0) {
@@ -238,43 +178,54 @@ export default function RecipeManagerScreen() {
     /**
      * Filter recipes based on current folder and search query
      */
-    const filteredRecipes = recipes.filter((recipe) => {
-        // Filter by folder
-        if (currentFolder && recipe.folder_id !== currentFolder.id) return false;
+    const filteredRecipes = useMemo(() => {
+        return (Array.isArray(recipes) ? recipes : []).filter((recipe) => {
+            // Filter by folder
+            if (currentFolder && recipe.folder_id !== currentFolder.id) return false;
 
-        // Filter by search query
-        if (!searchQuery.trim()) return true;
-        const query = searchQuery.toLowerCase();
-        const matchesName = recipe.meal_name.toLowerCase().includes(query);
-        const matchesIngredient = recipe.ingredients?.some(
-            (item) => item.name.toLowerCase().includes(query)
-        );
-        return matchesName || matchesIngredient;
-    });
+            // Filter by search query
+            if (!searchQuery.trim()) return true;
+            const query = searchQuery.toLowerCase();
+            const matchesName = recipe.meal_name.toLowerCase().includes(query);
+            const matchesIngredient = recipe.ingredients?.some(
+                (item) => item.name.toLowerCase().includes(query)
+            );
+            return matchesName || matchesIngredient;
+        });
+    }, [recipes, currentFolder, searchQuery]);
+
+    const recipeCountByFolder = useMemo(() => {
+        const map: Record<string, number> = {};
+        for (const r of recipes) {
+            const id = r.folder_id || '';
+            map[id] = (map[id] ?? 0) + 1;
+        }
+        return map;
+    }, [recipes]);
+
+    const showSkeleton =
+        !hasLoadedOnce &&
+        (loadingByResource.recipes || loading) &&
+        (Array.isArray(recipes) ? recipes : []).length === 0;
 
     // ========================================================================
     // FOLDER HANDLERS
     // ========================================================================
 
     /**
-     * Create a new folder via API
+     * Create a new folder via pantryContext
      */
     const handleCreateFolder = async () => {
         if (!newFolderName.trim()) return;
 
         setSaving(true);
         try {
-            const response = await folderApi.create({
+            const response = await addFolder({
                 name: newFolderName.trim(),
                 icon: 'FolderIcon',
             });
 
-            const createdFolder = unwrapEntityResponse<Folder>(
-                response.data as Folder | { folder?: Folder },
-                'folder',
-            );
-            if (response.success && createdFolder) {
-                setFolders((prev) => [...prev, createdFolder]);
+            if (response.success && response.data) {
                 setNewFolderName('');
                 setShowAddFolder(false);
             } else {
@@ -289,30 +240,19 @@ export default function RecipeManagerScreen() {
     };
 
     /**
-     * Update folder name via API
+     * Update folder name via pantryContext
      */
     const handleUpdateFolder = async () => {
         if (!editingFolder || !newFolderName.trim()) return;
 
         setSaving(true);
         try {
-            const response = await folderApi.update(editingFolder.id, {
+            await updateFolder({
+                ...editingFolder,
                 name: newFolderName.trim(),
             });
-
-            const updatedFolder = unwrapEntityResponse<Folder>(
-                response.data as Folder | { folder?: Folder },
-                'folder',
-            );
-            if (response.success && updatedFolder) {
-                setFolders((prev) =>
-                    prev.map((f) => (f.id === editingFolder.id ? updatedFolder : f)),
-                );
-                setEditingFolder(null);
-                setNewFolderName('');
-            } else {
-                Alert.alert('Error', response.message || 'Failed to update folder');
-            }
+            setEditingFolder(null);
+            setNewFolderName('');
         } catch (err) {
             console.error('[RecipeManager] Update folder error:', err);
             Alert.alert('Error', 'Failed to update folder. Please try again.');
@@ -322,41 +262,17 @@ export default function RecipeManagerScreen() {
     };
 
     /**
-     * Delete folder via API
-     * TODO: Backend should handle moving recipes to 'Uncategorized' or we need to do it here
+     * Delete folder via pantryContext
      */
     const handleDeleteFolder = async () => {
         if (!folderToDelete) return;
 
         setSaving(true);
         try {
-            const response = await folderApi.delete(folderToDelete.id);
-
-            if (response.success) {
-                // Remove folder from state
-                setFolders(folders.filter((f) => f.id !== folderToDelete.id));
-
-                // Update recipes that were in this folder to 'uncategorized'
-                // Note: This should ideally be handled by the backend
-                const uncategorizedFolder = folders.find(
-                    (f) => f.name.toLowerCase() === 'uncategorized'
-                );
-                if (uncategorizedFolder) {
-                    setRecipes(
-                        recipes.map((r) =>
-                            r.folder_id === folderToDelete.id
-                                ? { ...r, folder_id: uncategorizedFolder.id }
-                                : r
-                        )
-                    );
-                }
-
-                setFolderToDelete(null);
-                setShowDeleteConfirm(false);
-                if (currentFolder?.id === folderToDelete.id) setCurrentFolder(null);
-            } else {
-                Alert.alert('Error', response.message || 'Failed to delete folder');
-            }
+            await deleteFolder(folderToDelete.id);
+            setFolderToDelete(null);
+            setShowDeleteConfirm(false);
+            if (currentFolder?.id === folderToDelete.id) setCurrentFolder(null);
         } catch (err) {
             console.error('[RecipeManager] Delete folder error:', err);
             Alert.alert('Error', 'Failed to delete folder. Please try again.');
@@ -374,114 +290,172 @@ export default function RecipeManagerScreen() {
      */
     const handleAddIngredient = () => {
         if (isEditing && selectedRecipe) {
-            setSelectedRecipe({
-                ...selectedRecipe,
-                ingredients: [...(selectedRecipe.ingredients || []), { name: '', quantity: 1, unit: '' }],
-            });
+            setSelectedRecipe((prev) =>
+                prev
+                    ? {
+                          ...prev,
+                          ingredients: [
+                              ...(prev.ingredients || []),
+                              { name: '', quantity: 1, unit: 'pcs' },
+                          ],
+                      }
+                    : prev,
+            );
         } else {
-            setNewRecipe({
-                ...newRecipe,
-                ingredients: [...(newRecipe.ingredients || []), { name: '', quantity: 1, unit: '' }],
-            });
+            setNewRecipe((prev) => ({
+                ...prev,
+                ingredients: [...(prev.ingredients || []), { name: '', quantity: 1, unit: 'pcs' }],
+            }));
         }
     };
 
     /**
-     * Update ingredient field
+     * Update ingredient field; sync unit from catalog when name matches.
      */
-    const handleUpdateIngredient = (index: number, field: string, value: any) => {
-        if (isEditing && selectedRecipe) {
-            const updated = [...(selectedRecipe.ingredients || [])];
-            updated[index] = {
-                ...updated[index],
-                [field]: field === 'quantity' ? parseFloat(value) || 0 : value,
-            };
-            setSelectedRecipe({ ...selectedRecipe, ingredients: updated });
-        } else {
-            const updated = [...(newRecipe.ingredients || [])];
-            updated[index] = {
-                ...updated[index],
-                [field]: field === 'quantity' ? parseFloat(value) || 0 : value,
-            };
-            setNewRecipe({ ...newRecipe, ingredients: updated });
+    const patchIngredient = useCallback((
+        recipeIngredients: RecipeIngredient[],
+        index: number,
+        field: 'name' | 'quantity' | 'unit',
+        value: string,
+    ): RecipeIngredient[] => {
+        const updated = [...recipeIngredients];
+        const current = { ...updated[index] };
+
+        if (field === 'quantity') {
+            updated[index] = { ...current, quantity: parseFloat(value) || 0 };
+            return updated;
         }
-    };
+
+        if (field === 'unit') {
+            updated[index] = {
+                ...current,
+                unit: value,
+                // Free-typed rows stay unlocked; catalog-bound rows keep kind
+                unit_kind: current.ingredient_id
+                    ? current.unit_kind || kindOf(value) || undefined
+                    : undefined,
+            };
+            return updated;
+        }
+
+        // name change — bind to catalog when exact match so unit kind stays compatible
+        const catalog = findCatalogIngredient(value, ingredients);
+        updated[index] = applyCatalogIngredient(
+            { ...current, name: value },
+            catalog,
+            measurementSystem,
+        );
+        return updated;
+    }, [ingredients, measurementSystem]);
+
+    const resolveIngredientsForSave = useCallback(
+        (rows: RecipeIngredient[]): RecipeIngredient[] =>
+            rows
+                .filter((ing) => ing.name?.trim())
+                .map((ing) =>
+                    applyCatalogIngredient(
+                        ing,
+                        findCatalogIngredient(ing.name, ingredients),
+                        measurementSystem,
+                    ),
+                ),
+        [ingredients, measurementSystem],
+    );
+
+    const handleUpdateNewIngredient = useCallback(
+        (index: number, field: 'name' | 'quantity' | 'unit', value: string) => {
+            setNewRecipe((prev) => ({
+                ...prev,
+                ingredients: patchIngredient(prev.ingredients || [], index, field, value),
+            }));
+        },
+        [patchIngredient],
+    );
+
+    const handleUpdateSelectedIngredient = useCallback(
+        (index: number, field: 'name' | 'quantity' | 'unit', value: string) => {
+            setSelectedRecipe((prev) => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    ingredients: patchIngredient(prev.ingredients || [], index, field, value),
+                };
+            });
+        },
+        [patchIngredient],
+    );
+
+    const handleRemoveNewIngredient = useCallback((index: number) => {
+        setNewRecipe((prev) => ({
+            ...prev,
+            ingredients: (prev.ingredients || []).filter((_, i) => i !== index),
+        }));
+    }, []);
+
+    const handleRemoveSelectedIngredient = useCallback((index: number) => {
+        setSelectedRecipe((prev) =>
+            prev
+                ? {
+                      ...prev,
+                      ingredients: (prev.ingredients || []).filter((_, i) => i !== index),
+                  }
+                : prev,
+        );
+    }, []);
+
+    const focusFolder = useCallback((folderId: string) => {
+        if (!folderId) return;
+        const folder = folders.find((f) => f.id === folderId);
+        if (folder) {
+            setCurrentFolder(folder);
+        }
+    }, [folders]);
 
     /**
-     * Remove ingredient row
-     */
-    const handleRemoveIngredient = (index: number) => {
-        if (isEditing && selectedRecipe) {
-            setSelectedRecipe({
-                ...selectedRecipe,
-                ingredients: (selectedRecipe.ingredients || []).filter((_, i) => i !== index),
-            });
-        } else {
-            setNewRecipe({
-                ...newRecipe,
-                ingredients: (newRecipe.ingredients || []).filter((_, i) => i !== index),
-            });
-        }
-    };
-
-    /**
-     * Save recipe (create or update) via API
+     * Save recipe (create or update) via pantryContext
      */
     const handleSaveRecipe = async () => {
+        const recipeToSave = isEditing && selectedRecipe ? selectedRecipe : newRecipe;
+        const validIngredients = resolveIngredientsForSave(recipeToSave.ingredients ?? []);
+
+        if (!recipeToSave.meal_name?.trim()) {
+            Alert.alert('Error', 'Meal name is required');
+            return;
+        }
+        if (validIngredients.length === 0) {
+            Alert.alert('Error', 'Add at least one ingredient with a name');
+            return;
+        }
+
         setSaving(true);
         try {
             if (isEditing && selectedRecipe) {
-                // Update existing recipe
-                const response = await recipeApi.update(
-                    selectedRecipe.id,
-                    serializeRecipePayload({
-                        meal_name: selectedRecipe.meal_name,
-                        ingredients: selectedRecipe.ingredients,
-                        folder_id: selectedRecipe.folder_id,
-                        instructions: selectedRecipe.instructions,
-                        image: selectedRecipe.image,
-                    }) as Partial<Recipe>
-                );
+                const targetFolderId = selectedRecipe.folder_id || currentFolder?.id || '';
+                const editedSnapshot = normalizeRecipe({
+                    ...selectedRecipe,
+                    ingredients: validIngredients,
+                });
 
-                if (response.success && response.data) {
-                    const raw = response.data as unknown;
-                    const payload = (raw && typeof raw === 'object' && 'recipe' in (raw as object)
-                        ? (raw as { recipe: Record<string, unknown> }).recipe
-                        : raw) as Record<string, unknown>;
-                    const saved = normalizeRecipe(payload);
-                    setRecipes(recipes.map((r) => (r.id === selectedRecipe.id ? saved : r)));
-                    setSelectedRecipe(null);
-                    setIsEditing(false);
-                } else {
-                    Alert.alert('Error', response.message || 'Failed to update recipe');
-                }
+                setSelectedRecipe(null);
+                setIsEditing(false);
+                focusFolder(targetFolderId);
+
+                await updateRecipe(editedSnapshot);
+                focusFolder(editedSnapshot.folder_id || targetFolderId);
             } else {
-                // Create new recipe
-                const recipeData = serializeRecipePayload({
-                    meal_name: newRecipe.meal_name,
-                    ingredients: newRecipe.ingredients,
-                    folder_id: newRecipe.folder_id || currentFolder?.id,
+                const targetFolderId = (newRecipe.folder_id || currentFolder?.id || '').trim();
+                const response = await addRecipe({
+                    meal_name: newRecipe.meal_name!.trim(),
+                    folder_id: targetFolderId,
+                    ingredients: validIngredients,
                     instructions: newRecipe.instructions || [],
                     image: newRecipe.image || null,
-                }) as Partial<Recipe>;
-
-                const response = await recipeApi.create(recipeData);
+                });
 
                 if (response.success && response.data) {
-                    const raw = response.data as unknown;
-                    const payload = (raw && typeof raw === 'object' && 'recipe' in (raw as object)
-                        ? (raw as { recipe: Record<string, unknown> }).recipe
-                        : raw) as Record<string, unknown>;
-                    setRecipes([...recipes, normalizeRecipe(payload)]);
-                    // Reset form
-                    setNewRecipe({
-                        meal_name: '',
-                        ingredients: [{ name: '', quantity: 1, unit: '' }],
-                        image: null,
-                        folder_id: '',
-                        instructions: [],
-                    });
+                    setNewRecipe(createEmptyRecipeForm(targetFolderId));
                     setShowAddRecipe(false);
+                    focusFolder(response.data.folder_id || targetFolderId);
                 } else {
                     Alert.alert('Error', response.message || 'Failed to create recipe');
                 }
@@ -495,9 +469,9 @@ export default function RecipeManagerScreen() {
     };
 
     /**
-     * Delete recipe via API
+     * Delete recipe via pantryContext
      */
-    const handleDeleteRecipe = async (recipeId: string) => {
+    const handleDeleteRecipe = useCallback((recipeId: string) => {
         Alert.alert('Delete Recipe', 'Are you sure you want to delete this recipe?', [
             { text: 'Cancel', style: 'cancel' },
             {
@@ -505,12 +479,7 @@ export default function RecipeManagerScreen() {
                 style: 'destructive',
                 onPress: async () => {
                     try {
-                        const response = await recipeApi.delete(recipeId);
-                        if (response.success) {
-                            setRecipes(recipes.filter((r) => r.id !== recipeId));
-                        } else {
-                            Alert.alert('Error', response.message || 'Failed to delete recipe');
-                        }
+                        await deleteRecipe(recipeId);
                     } catch (err) {
                         console.error('[RecipeManager] Delete recipe error:', err);
                         Alert.alert('Error', 'Failed to delete recipe. Please try again.');
@@ -518,7 +487,7 @@ export default function RecipeManagerScreen() {
                 },
             },
         ]);
-    };
+    }, [deleteRecipe]);
 
     // ========================================================================
     // IMAGE PICKER HANDLERS
@@ -544,9 +513,9 @@ export default function RecipeManagerScreen() {
         if (!result.canceled && result.assets[0]) {
             const imageData = { public_id: '', url: result.assets[0].uri };
             if (isEditing && selectedRecipe) {
-                setSelectedRecipe({ ...selectedRecipe, image: imageData });
+                setSelectedRecipe((prev) => (prev ? { ...prev, image: imageData } : prev));
             } else {
-                setNewRecipe({ ...newRecipe, image: imageData });
+                setNewRecipe((prev) => ({ ...prev, image: imageData }));
             }
         }
     };
@@ -570,9 +539,9 @@ export default function RecipeManagerScreen() {
         if (!result.canceled && result.assets[0]) {
             const imageData = { public_id: '', url: result.assets[0].uri };
             if (isEditing && selectedRecipe) {
-                setSelectedRecipe({ ...selectedRecipe, image: imageData });
+                setSelectedRecipe((prev) => (prev ? { ...prev, image: imageData } : prev));
             } else {
-                setNewRecipe({ ...newRecipe, image: imageData });
+                setNewRecipe((prev) => ({ ...prev, image: imageData }));
             }
         }
     };
@@ -582,9 +551,9 @@ export default function RecipeManagerScreen() {
      */
     const removeImage = () => {
         if (isEditing && selectedRecipe) {
-            setSelectedRecipe({ ...selectedRecipe, image: null });
+            setSelectedRecipe((prev) => (prev ? { ...prev, image: null } : prev));
         } else {
-            setNewRecipe({ ...newRecipe, image: null });
+            setNewRecipe((prev) => ({ ...prev, image: null }));
         }
     };
 
@@ -594,9 +563,9 @@ export default function RecipeManagerScreen() {
     const handleInstructionsChange = (text: string) => {
         const instructionsArray = text.split('\n').filter(line => line.trim());
         if (isEditing && selectedRecipe) {
-            setSelectedRecipe({ ...selectedRecipe, instructions: instructionsArray });
+            setSelectedRecipe((prev) => (prev ? { ...prev, instructions: instructionsArray } : prev));
         } else {
-            setNewRecipe({ ...newRecipe, instructions: instructionsArray });
+            setNewRecipe((prev) => ({ ...prev, instructions: instructionsArray }));
         }
     };
 
@@ -614,33 +583,55 @@ export default function RecipeManagerScreen() {
     // RENDER HELPERS
     // ========================================================================
 
+    const handleRenameFolder = useCallback((f: Folder) => {
+        setEditingFolder(f);
+        setNewFolderName(f.name);
+        setShowFolderActions(null);
+    }, []);
+
+    const handleAddRecipeToFolder = useCallback((f: Folder) => {
+        openAddRecipeForm(f.id);
+        setShowFolderActions(null);
+    }, [openAddRecipeForm]);
+
+    const handleRequestDeleteFolder = useCallback((f: Folder) => {
+        setFolderToDelete(f);
+        setShowDeleteConfirm(true);
+        setShowFolderActions(null);
+    }, []);
+
+    const handleOpenRecipe = useCallback((r: Recipe) => {
+        setSelectedRecipe(r);
+        setIsEditing(false);
+    }, []);
+
+    const handleEditRecipe = useCallback((r: Recipe) => {
+        setSelectedRecipe(r);
+        setIsEditing(true);
+        void fetchAllIngredients();
+    }, [fetchAllIngredients]);
+
     /**
      * Render folder card
      */
     const renderFolderCard = useCallback(({ item: folder }: { item: Folder }) => (
         <FolderRow
             folder={folder}
-            recipeCount={recipes.filter((r) => r.folder_id === folder.id).length}
+            recipeCount={recipeCountByFolder[folder.id] ?? 0}
             showActions={showFolderActions === folder.id}
             onOpen={setCurrentFolder}
             onToggleActions={setShowFolderActions}
-            onRename={(f) => {
-                setEditingFolder(f);
-                setNewFolderName(f.name);
-                setShowFolderActions(null);
-            }}
-            onAddRecipe={(f) => {
-                setNewRecipe({ ...newRecipe, folder_id: f.id });
-                setShowAddRecipe(true);
-                setShowFolderActions(null);
-            }}
-            onDelete={(f) => {
-                setFolderToDelete(f);
-                setShowDeleteConfirm(true);
-                setShowFolderActions(null);
-            }}
+            onRename={handleRenameFolder}
+            onAddRecipe={handleAddRecipeToFolder}
+            onDelete={handleRequestDeleteFolder}
         />
-    ), [recipes, showFolderActions, newRecipe]);
+    ), [
+        recipeCountByFolder,
+        showFolderActions,
+        handleRenameFolder,
+        handleAddRecipeToFolder,
+        handleRequestDeleteFolder,
+    ]);
 
     /**
      * Render recipe card
@@ -648,49 +639,11 @@ export default function RecipeManagerScreen() {
     const renderRecipeCard = useCallback(({ item: recipe }: { item: Recipe }) => (
         <RecipeRow
             recipe={recipe}
-            onOpen={(r) => {
-                setSelectedRecipe(r);
-                setIsEditing(false);
-            }}
-            onEdit={(r) => {
-                setSelectedRecipe(r);
-                setIsEditing(true);
-            }}
+            onOpen={handleOpenRecipe}
+            onEdit={handleEditRecipe}
             onDelete={handleDeleteRecipe}
         />
-    ), [handleDeleteRecipe]);
-
-    /**
-     * Ingredient row component for forms
-     */
-    const IngredientRow = ({ item, index }: { item: Ingredient; index: number }) => (
-        <View className="mb-2 gap-2">
-            <View className="flex-row items-center gap-2">
-                <TextInput
-                    value={item.name}
-                    onChangeText={(text) => handleUpdateIngredient(index, 'name', text)}
-                    placeholder="Ingredient name"
-                    className="flex-1 p-3 border border-line rounded-lg bg-linen text-ink"
-                />
-                <TextInput
-                    value={item.quantity.toString()}
-                    onChangeText={(text) => handleUpdateIngredient(index, 'quantity', text)}
-                    keyboardType="numeric"
-                    className="w-16 p-3 border border-line rounded-lg bg-linen text-ink text-center"
-                />
-                <TouchableOpacity onPress={() => handleRemoveIngredient(index)} className="p-2">
-                    <TrashIcon size={18} color={colors.danger} />
-                </TouchableOpacity>
-            </View>
-            <UnitSelect
-                kind={preferredUnitForIngredient(item, measurementSystem).kind}
-                value={item.unit}
-                onChange={(unit) => handleUpdateIngredient(index, 'unit', unit)}
-                measurementSystem={measurementSystem}
-                preferSystemUnits
-            />
-        </View>
-    );
+    ), [handleOpenRecipe, handleEditRecipe, handleDeleteRecipe]);
 
     const handleNavigateBack = () => {
         if (showAddRecipe) {
@@ -704,10 +657,19 @@ export default function RecipeManagerScreen() {
         }
         if (currentFolder) {
             setCurrentFolder(null);
-            return;
         }
-        navigation.goBack();
     };
+
+    const isNestedRecipeView = Boolean(showAddRecipe || selectedRecipe || currentFolder);
+
+    const recipeHeader = (
+        <AppHeader
+            title={t('recipes.title')}
+            showMenuButton={!isNestedRecipeView}
+            showBackButton={isNestedRecipeView}
+            onBack={handleNavigateBack}
+        />
+    );
 
     const renderFolderPicker = (
         selectedFolderId: string | undefined,
@@ -739,10 +701,10 @@ export default function RecipeManagerScreen() {
     // ========================================================================
     // LOADING STATE
     // ========================================================================
-    if (loading) {
+    if (showSkeleton) {
         return (
             <View className="flex-1 bg-linen">
-                <AppHeader title={t('recipes.title')} showBackButton onBack={handleNavigateBack} />
+                {recipeHeader}
                 <View className="flex-1 p-4">
                     <SkeletonList count={6} />
                 </View>
@@ -756,7 +718,7 @@ export default function RecipeManagerScreen() {
     if (error) {
         return (
             <View className="flex-1 bg-linen">
-                <AppHeader title={t('recipes.title')} showBackButton onBack={handleNavigateBack} />
+                {recipeHeader}
                 <View className="flex-1 items-center justify-center p-6">
                     <AlertCircleIcon size={48} color={colors.danger} />
                     <Text className="text-ink text-lg mt-4 text-center">{error}</Text>
@@ -775,8 +737,8 @@ export default function RecipeManagerScreen() {
     // MAIN RENDER
     // ========================================================================
     return (
-        <View className="flex-1 bg-linen">
-            <AppHeader title={t('recipes.title')} showBackButton onBack={handleNavigateBack} />
+        <View className="flex-1 bg-linen" testID="recipe-screen">
+            {recipeHeader}
 
             {!showAddRecipe && !selectedRecipe ? (
                 <View className="flex-1 p-4">
@@ -811,6 +773,7 @@ export default function RecipeManagerScreen() {
                             data={folders}
                             renderItem={renderFolderCard}
                             keyExtractor={(item) => item.id}
+                            drawDistance={DRAW_DISTANCE}
                             refreshing={refreshing}
                             onRefresh={handleRefresh}
                             ListHeaderComponent={
@@ -843,6 +806,8 @@ export default function RecipeManagerScreen() {
                             data={filteredRecipes}
                             renderItem={renderRecipeCard}
                             keyExtractor={(item) => item.id}
+                            extraData={filteredRecipes}
+                            drawDistance={DRAW_DISTANCE}
                             refreshing={refreshing}
                             onRefresh={handleRefresh}
                             ListHeaderComponent={
@@ -859,10 +824,8 @@ export default function RecipeManagerScreen() {
                                         />
                                     </View>
                                     <TouchableOpacity
-                                        onPress={() => {
-                                            setNewRecipe({ ...newRecipe, folder_id: currentFolder.id });
-                                            setShowAddRecipe(true);
-                                        }}
+                                        testID="recipe-add-button"
+                                        onPress={() => openAddRecipeForm(currentFolder.id)}
                                         className="flex-row items-center justify-center bg-surface border border-line py-3 rounded-xl mb-4"
                                     >
                                         <PlusIcon size={18} color={colors.ink} />
@@ -873,18 +836,6 @@ export default function RecipeManagerScreen() {
                             ListEmptyComponent={
                                 <View className="bg-surface rounded-xl p-6 items-center border border-line">
                                     <Text className="text-muted">No recipes found</Text>
-                                    {!searchQuery && (
-                                        <AskAiEmptyCta
-                                            hint="Skip the forms ??just tell the AI what you need."
-                                            label="Ask AI to import a recipe"
-                                            onPress={() =>
-                                                navigation.navigate(
-                                                    'AICookingAssistant' as never,
-                                                    { initialPrompt: 'Import a recipe from a URL' } as never,
-                                                )
-                                            }
-                                        />
-                                    )}
                                 </View>
                             }
                         />
@@ -893,6 +844,7 @@ export default function RecipeManagerScreen() {
             ) : (
             <ScrollView
                 className="flex-1 p-4"
+                keyboardShouldPersistTaps="handled"
                 refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.herb} colors={[colors.herb]} />
                 }
@@ -921,13 +873,19 @@ export default function RecipeManagerScreen() {
                                     <TextInput
                                         value={selectedRecipe.meal_name}
                                         onChangeText={(text) =>
-                                            setSelectedRecipe({ ...selectedRecipe, meal_name: text })
+                                            setSelectedRecipe((prev) =>
+                                                prev ? { ...prev, meal_name: text } : prev,
+                                            )
                                         }
+                                        autoComplete="off"
+                                        textContentType="none"
                                         className="w-full p-3 border border-line rounded-xl mb-4 bg-linen text-ink"
                                     />
 
                                     {renderFolderPicker(selectedRecipe.folder_id, (folderId) =>
-                                        setSelectedRecipe({ ...selectedRecipe, folder_id: folderId })
+                                        setSelectedRecipe((prev) =>
+                                            prev ? { ...prev, folder_id: folderId } : prev,
+                                        )
                                     )}
 
                                     <Text className="text-ink mb-2">Instructions / Steps</Text>
@@ -953,7 +911,15 @@ export default function RecipeManagerScreen() {
                                     </View>
 
                                     {(selectedRecipe.ingredients || []).map((item, index) => (
-                                        <IngredientRow key={index} item={item} index={index} />
+                                        <RecipeIngredientRow
+                                            key={`edit-ingredient-${index}`}
+                                            item={item}
+                                            index={index}
+                                            measurementSystem={measurementSystem}
+                                            onUpdate={handleUpdateSelectedIngredient}
+                                            onRemove={handleRemoveSelectedIngredient}
+                                            namePlaceholder={t('recipes.searchIngredient')}
+                                        />
                                     ))}
 
                                     <View className="flex-row gap-2 mt-4">
@@ -1058,14 +1024,19 @@ export default function RecipeManagerScreen() {
                             {/* Meal Name */}
                             <Text className="text-ink mb-2">Meal Name *</Text>
                             <TextInput
+                                testID="recipe-meal-name"
                                 value={newRecipe.meal_name}
-                                onChangeText={(text) => setNewRecipe({ ...newRecipe, meal_name: text })}
-                                placeholder="Enter meal name"
+                                onChangeText={(text) =>
+                                    setNewRecipe((prev) => ({ ...prev, meal_name: text }))
+                                }
+                                placeholder={t('recipes.mealNamePlaceholder')}
+                                autoComplete="off"
+                                textContentType="none"
                                 className="w-full p-3 border border-line rounded-xl mb-4 bg-linen text-ink"
                             />
 
                             {renderFolderPicker(newRecipe.folder_id, (folderId) =>
-                                setNewRecipe({ ...newRecipe, folder_id: folderId })
+                                setNewRecipe((prev) => ({ ...prev, folder_id: folderId }))
                             )}
 
                             {/* Recipe Image */}
@@ -1114,7 +1085,16 @@ export default function RecipeManagerScreen() {
                             </View>
 
                             {(newRecipe.ingredients || []).map((item, index) => (
-                                <IngredientRow key={index} item={item} index={index} />
+                                <RecipeIngredientRow
+                                    key={`new-ingredient-${index}`}
+                                    item={item}
+                                    index={index}
+                                    measurementSystem={measurementSystem}
+                                    onUpdate={handleUpdateNewIngredient}
+                                    onRemove={handleRemoveNewIngredient}
+                                    nameTestID={`recipe-ingredient-name-${index}`}
+                                    namePlaceholder={t('recipes.searchIngredient')}
+                                />
                             ))}
 
                             {/* Instructions */}
@@ -1131,13 +1111,16 @@ export default function RecipeManagerScreen() {
 
                             {/* Save Button */}
                             <TouchableOpacity
+                                testID="recipe-save-button"
                                 onPress={handleSaveRecipe}
                                 disabled={
                                     !newRecipe.meal_name?.trim() ||
-                                    (newRecipe.ingredients || []).length === 0 ||
+                                    !(newRecipe.ingredients || []).some((ing) => ing.name?.trim()) ||
                                     saving
                                 }
-                                className={`w-full py-3 rounded-xl mt-2 ${newRecipe.meal_name?.trim() && (newRecipe.ingredients || []).length > 0 && !saving
+                                className={`w-full py-3 rounded-xl mt-2 ${newRecipe.meal_name?.trim() &&
+                                    (newRecipe.ingredients || []).some((ing) => ing.name?.trim()) &&
+                                    !saving
                                     ? 'bg-herb'
                                     : 'bg-sage'
                                     }`}
@@ -1146,7 +1129,8 @@ export default function RecipeManagerScreen() {
                                     <ActivityIndicator color={colors.onHerb} />
                                 ) : (
                                     <Text
-                                        className={`text-center font-medium ${newRecipe.meal_name?.trim() && (newRecipe.ingredients || []).length > 0
+                                        className={`text-center font-medium ${newRecipe.meal_name?.trim() &&
+                                            (newRecipe.ingredients || []).some((ing) => ing.name?.trim())
                                             ? 'text-white'
                                             : 'text-muted'
                                             }`}

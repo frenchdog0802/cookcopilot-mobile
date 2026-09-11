@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, memo } from 'react';
 import { StyleSheet, TextStyle } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { colors } from '../theme/tokens';
@@ -12,7 +12,7 @@ interface ChatMessageContentProps {
 }
 
 /** Render GFM markdown (tables, headings, bold, lists) inside chat bubbles. */
-export default function ChatMessageContent({
+function ChatMessageContent({
   content,
   style,
   isUser = false,
@@ -93,3 +93,5 @@ export default function ChatMessageContent({
 
   return <Markdown style={markdownStyles}>{content}</Markdown>;
 }
+
+export default memo(ChatMessageContent);

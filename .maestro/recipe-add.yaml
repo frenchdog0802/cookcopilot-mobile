@@ -1,0 +1,36 @@
+appId: com.lardermind.app
+---
+- stopApp
+- runFlow:
+    file: subflows/connect-dev-server.yaml
+- runFlow:
+    file: subflows/login.yaml
+- tapOn:
+    id: "header-menu"
+- tapOn:
+    id: "drawer-recipes"
+- extendedWaitUntil:
+    visible: "Recipe Manager"
+    timeout: 10000
+- tapOn:
+    text: "Uncategorized"
+- extendedWaitUntil:
+    visible: "Add New Recipe"
+    timeout: 15000
+- tapOn:
+    text: "Add New Recipe"
+- extendedWaitUntil:
+    visible: "Meal Name *"
+    timeout: 10000
+- tapOn:
+    text: "Enter what you cooked"
+- inputText: "E2E Pasta"
+- tapOn:
+    text: "Search ingredient..."
+- inputText: "Tomato"
+- hideKeyboard
+- tapOn:
+    text: "Save Recipe"
+- extendedWaitUntil:
+    visible: "E2E Pasta"
+    timeout: 20000

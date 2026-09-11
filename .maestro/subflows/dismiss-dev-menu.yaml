@@ -1,0 +1,10 @@
+appId: com.lardermind.app
+---
+- tapOn:
+    text: "Continue"
+    optional: true
+- extendedWaitUntil:
+    notVisible:
+      text: "This is the developer menu"
+    timeout: 5000
+    optional: true

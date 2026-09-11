@@ -9,12 +9,37 @@ type ShoppingListItemDto = {
 
 function fromDto(dto: ShoppingListItemDto): ShoppingListItem {
     const details = dto.details ?? {};
+    const flat = dto as ShoppingListItemDto & Partial<ShoppingListItem>;
     return {
-        id: String(dto.id ?? details.id ?? ''),
-        name: String(dto.name ?? details.name ?? ''),
-        quantity: Number(details.quantity ?? 0),
-        unit: String(details.unit ?? ''),
-        checked: Boolean(details.checked ?? false),
+        id: String(flat.id ?? details.id ?? ''),
+        name: String(flat.name ?? details.name ?? ''),
+        quantity: Number(flat.quantity ?? details.quantity ?? 0),
+        unit: String(flat.unit ?? details.unit ?? ''),
+        checked: Boolean(flat.checked ?? details.checked ?? false),
+        ingredient_id:
+            flat.ingredient_id != null
+                ? String(flat.ingredient_id)
+                : details.ingredient_id != null
+                  ? String(details.ingredient_id)
+                  : undefined,
+        unit_kind:
+            flat.unit_kind != null
+                ? String(flat.unit_kind)
+                : details.unit_kind != null
+                  ? String(details.unit_kind)
+                  : undefined,
+        base_unit:
+            flat.base_unit != null
+                ? String(flat.base_unit)
+                : details.base_unit != null
+                  ? String(details.base_unit)
+                  : undefined,
+        default_display_unit:
+            flat.default_display_unit != null
+                ? String(flat.default_display_unit)
+                : details.default_display_unit != null
+                  ? String(details.default_display_unit)
+                  : undefined,
     };
 }
 

@@ -1,0 +1,30 @@
+appId: com.lardermind.app
+---
+# Release E2E APK opens directly to auth; debug builds may show Dev Launcher first.
+- launchApp
+- runFlow:
+    when:
+      visible: "Load embedded bundle"
+    commands:
+      - tapOn: "Load embedded bundle"
+- runFlow:
+    when:
+      visible: "DEVELOPMENT SERVERS"
+    commands:
+      - runFlow:
+          when:
+            visible: "Load embedded bundle"
+          commands:
+            - tapOn: "Load embedded bundle"
+- extendedWaitUntil:
+    visible: "Email"
+    timeout: 180000
+- runFlow:
+    when:
+      visible: "TypeError"
+    commands:
+      - tapOn:
+          text: ".*RELOAD.*"
+      - extendedWaitUntil:
+          visible: "Email"
+          timeout: 120000

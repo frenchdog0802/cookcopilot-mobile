@@ -1,30 +1,36 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Platform, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { ArrowLeft, Menu } from 'lucide-react-native';
+import { DrawerActions, useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { colors } from '../theme/tokens';
 
 interface AppHeaderProps {
   title: string;
   showBackButton?: boolean;
+  showMenuButton?: boolean;
   onBack?: () => void;
   rightElement?: React.ReactNode;
   onRightPress?: () => void;
   /** @deprecated Prefer quiet linen chrome; kept for call-site compatibility */
   variant?: 'quiet' | 'surface' | 'primary' | 'white';
+  onLayoutHeight?: (height: number) => void;
 }
 
 export default function AppHeader({
   title,
   showBackButton = false,
+  showMenuButton = false,
   onBack,
   rightElement,
   onRightPress,
   variant = 'quiet',
+  onLayoutHeight,
 }: AppHeaderProps) {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
 
   const handleBack = () => {
     if (onBack) {
@@ -34,18 +40,33 @@ export default function AppHeader({
     }
   };
 
+  const handleMenu = () => {
+    navigation.dispatch(DrawerActions.openDrawer());
+  };
+
   const bgClass = variant === 'surface' ? 'bg-surface' : 'bg-linen';
 
   return (
     <View
       className={bgClass}
       style={{
-        paddingTop:
-          Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 12 : insets.top + 12,
+        paddingTop: insets.top + 12,
       }}
+      onLayout={(e) => onLayoutHeight?.(e.nativeEvent.layout.height)}
     >
       <View className="flex-row items-center justify-between px-4 pb-3 border-b border-line">
-        {showBackButton ? (
+        {showMenuButton ? (
+          <TouchableOpacity
+            onPress={handleMenu}
+            testID="header-menu"
+            accessibilityRole="button"
+            accessibilityLabel={t('nav.openMenu')}
+            className="w-10 h-10 items-center justify-center rounded-full"
+            activeOpacity={0.7}
+          >
+            <Menu size={24} color={colors.ink} />
+          </TouchableOpacity>
+        ) : showBackButton ? (
           <TouchableOpacity
             onPress={handleBack}
             className="w-10 h-10 items-center justify-center rounded-full"

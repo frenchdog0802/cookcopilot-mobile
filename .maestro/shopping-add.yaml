@@ -1,0 +1,25 @@
+appId: com.lardermind.app
+---
+- stopApp
+- runFlow:
+    file: subflows/connect-dev-server.yaml
+- runFlow:
+    file: subflows/login.yaml
+- tapOn:
+    id: "header-menu"
+- tapOn:
+    id: "drawer-shopping"
+- extendedWaitUntil:
+    visible: "Shopping List"
+    timeout: 10000
+- tapOn:
+    text: "Add New Shopping Item"
+- tapOn:
+    id: "shopping-item-name"
+- inputText: "E2E Milk"
+- hideKeyboard
+- tapOn:
+    id: "shopping-save-item"
+- extendedWaitUntil:
+    visible: "E2E Milk"
+    timeout: 15000

@@ -27,7 +27,7 @@ const backoffTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const BACKOFF_MS = [2000, 5000, 15000];
 const backoffAttempt = new Map<string, number>();
 
-function clearBackoff(userId: string): void {
+export function clearBackoff(userId: string): void {
   const timer = backoffTimers.get(userId);
   if (timer) {
     clearTimeout(timer);
@@ -63,7 +63,7 @@ export async function flushShoppingListQueue(
   }
   if (flushLocks.has(userId)) {
     const mutations = await loadQueue(userId);
-    return { ok: true, remaining: mutations.length };
+    return { ok: false, error: 'Sync in progress', remaining: mutations.length };
   }
 
   flushLocks.add(userId);
@@ -76,6 +76,9 @@ export async function flushShoppingListQueue(
 
     let mutations = coalesce(await loadQueue(userId));
     let items = await loadSnapshot(userId);
+    if (!Array.isArray(items)) {
+      items = [];
+    }
     callbacks.onQueue?.(mutations);
 
     while (mutations.length > 0) {

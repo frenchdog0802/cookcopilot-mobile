@@ -30,7 +30,7 @@ describe('auth API', () => {
 
             await auth.signin('test@test.com', 'password123');
 
-            expect(mockedApi.post).toHaveBeenCalledWith('/auth/signin', {
+            expect(mockedApi.post).toHaveBeenCalledWith('auth/signin', {
                 email: 'test@test.com',
                 password: 'password123',
             });
@@ -60,7 +60,7 @@ describe('auth API', () => {
             const userData = { id: '', name: 'New', email: 'new@test.com', first_name: 'New', last_name: 'User' };
             await auth.signup(userData, 'password123');
 
-            expect(mockedApi.post).toHaveBeenCalledWith('/auth/signup', {
+            expect(mockedApi.post).toHaveBeenCalledWith('auth/signup', {
                 ...userData,
                 password: 'password123',
             });

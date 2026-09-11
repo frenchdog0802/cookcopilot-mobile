@@ -11,6 +11,8 @@ export type CachedImageProps = {
   recyclingKey?: string;
   accessibilityLabel?: string;
   placeholderColor?: string;
+  /** 0 keeps scroll/list recycled cells snappy; heroes can pass 200. */
+  transition?: number;
 };
 
 export function CachedImage({
@@ -21,6 +23,7 @@ export function CachedImage({
   recyclingKey,
   accessibilityLabel,
   placeholderColor = colors.linen,
+  transition = 0,
 }: CachedImageProps) {
   if (!uri) {
     return (
@@ -41,7 +44,8 @@ export function CachedImage({
       cachePolicy="memory-disk"
       recyclingKey={recyclingKey ?? uri}
       accessibilityLabel={accessibilityLabel}
-      transition={200}
+      transition={transition}
+      priority="normal"
     />
   );
 }

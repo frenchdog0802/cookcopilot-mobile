@@ -25,13 +25,20 @@
   },
   "nav": {
     "home": "Home",
-    "aiChat": "AI Chat",
+    "aiChat": "Chat",
     "calendar": "Calendar",
     "pantry": "Pantry",
+    "inventory": "Inventory",
     "shoppingList": "Shopping List",
     "shopping": "Shopping",
     "recipes": "Recipes",
     "settings": "Settings",
+    "subscription": "Subscription",
+    "recents": "Recents",
+    "newChat": "New chat",
+    "openMenu": "Open menu",
+    "recentsEmpty": "No recent chats yet",
+    "recentsLoadError": "Couldn't load chats",
     "tagline": "An AI assistant that plans your meals from what's in your pantry."
   },
   "mealTypes": {
@@ -196,7 +203,16 @@
     "itemNamePlaceholder": "Search or add item name",
     "itemsToBuy": "Items to Buy",
     "empty": "No items in your shopping list",
-    "checked": "Checked off"
+    "checked": "Checked off",
+    "completeAll": "Complete all",
+    "completing": "Completing...",
+    "itemAdded": "Item added to shopping list!",
+    "itemUpdated": "Item updated!",
+    "allPurchased": "All {{count}} item(s) purchased!",
+    "syncOffline": "You're offline - changes save on this device",
+    "syncing": "Syncing {{count}} change(s)...",
+    "syncPending": "{{count}} change(s) waiting to sync",
+    "syncRetry": "Retry sync"
   },
   "recipes": {
     "title": "Recipe Manager",
@@ -225,9 +241,13 @@
     "preferencesSaved": "Preferences saved",
     "mealSuggestions": "Meal suggestions",
     "placeholder": "Ask about cooking, meal plans, or recipes...",
-    "welcome": "Hi! Tell me what you need — import a recipe URL, plan your week, update your pantry, or ask what you can cook. I'll handle it and show you what changed.",
+    "welcome": "Hi! Tell me what you need - import a recipe URL, plan your week, update your pantry, or ask what you can cook. I'll handle it and show you what changed.",
+    "greetingMorning": "Good morning",
+    "greetingAfternoon": "Good afternoon",
+    "greetingEvening": "Good evening",
     "newChat": "New chat",
-    "emptyHint": "Skip the forms — just tell the AI what you need.",
+    "clearChat": "Clear",
+    "emptyHint": "Skip the forms - just tell the AI what you need.",
     "emptyCta": {
       "pantry": "Ask AI to update pantry",
       "shopping": "Ask AI to build a list",
@@ -249,7 +269,7 @@
       "Add chicken, rice, and broccoli to my pantry",
       "Organize my pantry"
     ],
-    "demoWelcome": "Hi! Tell me what you need — plan dinner from your pantry, import a recipe, or ask what you can cook. Try a prompt below.",
+    "demoWelcome": "Hi! Tell me what you need - plan dinner from your pantry, import a recipe, or ask what you can cook. Try a prompt below.",
     "demoSuggestedPrompts": [
       "What can I cook with what I have?",
       "Plan dinners for the rest of this week",
@@ -257,9 +277,9 @@
     ],
     "demoFallback": "Great question! Sign up free to get personalized answers based on your pantry, family preferences, and calendar.",
     "demoResponses": {
-      "What can I cook with what I have?": "You have chicken breast, rice, broccoli, and soy sauce in your pantry. How about **Garlic Soy Chicken & Broccoli**? About 25 minutes — I only added garlic to your shopping list.",
-      "Plan dinners for the rest of this week": "Here's your plan — skipping spicy meals (Alex's preference) and using your expiring spinach:\n\n• Mon: Lemon herb chicken & rice\n• Tue: Spinach lasagna\n• Wed: Veggie stir-fry with tofu\n• Thu: Slow-cooker chili\n• Fri: Fish tacos (kid-friendly)\n\nAdded 6 items to your grocery list.",
-      "Add chicken, rice, and broccoli to my pantry": "Done — updated your pantry:\n\n• +2 lb chicken breast\n• +1 bag rice\n• +1 head broccoli\n\nI'll prioritize these in your next meal plan."
+      "What can I cook with what I have?": "You have chicken breast, rice, broccoli, and soy sauce in your pantry. How about **Garlic Soy Chicken & Broccoli**? About 25 minutes - I only added garlic to your shopping list.",
+      "Plan dinners for the rest of this week": "Here's your plan - skipping spicy meals (Alex's preference) and using your expiring spinach:\n\n• Mon: Lemon herb chicken & rice\n• Tue: Spinach lasagna\n• Wed: Veggie stir-fry with tofu\n• Thu: Slow-cooker chili\n• Fri: Fish tacos (kid-friendly)\n\nAdded 6 items to your grocery list.",
+      "Add chicken, rice, and broccoli to my pantry": "Done - updated your pantry:\n\n• +2 lb chicken breast\n• +1 bag rice\n• +1 head broccoli\n\nI'll prioritize these in your next meal plan."
     }
   }
 }

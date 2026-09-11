@@ -24,5 +24,13 @@ export {
 } from './queue';
 export { mergeNames } from './mergeNames';
 export { getIsOnline, subscribeConnectivity, isStateOnline } from './connectivity';
-export { flushShoppingListQueue } from './sync';
+export {
+  createSerialQueue,
+  applyItemUpdate,
+  applyItemRemove,
+  applyMarkAllChecked,
+  enqueueMarkAllUpdates,
+} from './localWrites';
+export { flushShoppingListQueue, clearBackoff } from './sync';
 export type { FlushResult } from './sync';
+

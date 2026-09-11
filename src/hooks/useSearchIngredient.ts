@@ -13,14 +13,18 @@ export default function useSearchIngredients(
     const [loading, setLoading] = useState(false);
 
     const filteredIngredients = useMemo(() => {
+        const list = Array.isArray(ingredients) ? ingredients : [];
         if (!query.trim()) {
-            return ingredients.slice(0, 10); // Return first 10 if no query
+            return list.slice(0, 10);
         }
 
         const lowerQuery = query.toLowerCase();
-        return ingredients.filter((ingredient) =>
-            ingredient.name && ingredient.name.toLowerCase().includes(lowerQuery)
-        ).slice(0, 10); // Limit results
+        return list
+            .filter(
+                (ingredient) =>
+                    ingredient.name && ingredient.name.toLowerCase().includes(lowerQuery),
+            )
+            .slice(0, 10);
     }, [query, ingredients]);
 
     // Simulate loading state for smoother UX

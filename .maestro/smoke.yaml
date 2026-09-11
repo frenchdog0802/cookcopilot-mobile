@@ -1,0 +1,52 @@
+appId: com.lardermind.app
+---
+- stopApp
+- runFlow:
+    file: subflows/connect-dev-server.yaml
+- runFlow:
+    file: subflows/login.yaml
+- assertVisible:
+    id: "header-menu"
+- tapOn:
+    id: "header-menu"
+- assertVisible:
+    id: "drawer-calendar"
+- tapOn:
+    id: "drawer-calendar"
+- extendedWaitUntil:
+    visible: "Cooking Calendar"
+    timeout: 10000
+- tapOn:
+    id: "header-menu"
+- tapOn:
+    id: "drawer-inventory"
+- extendedWaitUntil:
+    visible: "Kitchen Inventory"
+    timeout: 10000
+- tapOn:
+    id: "header-menu"
+- tapOn:
+    id: "drawer-shopping"
+- extendedWaitUntil:
+    visible: "Shopping List"
+    timeout: 10000
+- tapOn:
+    id: "header-menu"
+- tapOn:
+    id: "drawer-recipes"
+- extendedWaitUntil:
+    visible: "Recipe Manager"
+    timeout: 10000
+- tapOn:
+    id: "header-menu"
+- tapOn:
+    id: "drawer-settings"
+- extendedWaitUntil:
+    visible: "Settings"
+    timeout: 10000
+- tapOn:
+    id: "header-menu"
+- tapOn:
+    id: "drawer-chat"
+- assertVisible:
+    id: "header-menu"

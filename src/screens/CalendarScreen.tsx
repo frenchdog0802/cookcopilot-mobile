@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     View,
     Text,
@@ -7,8 +7,8 @@ import {
     Modal,
     TextInput,
     Alert,
-    Dimensions,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { useTranslation } from 'react-i18next';
 import { Calendar as RNCalendar } from 'react-native-calendars';
 import {
@@ -22,33 +22,31 @@ import {
     ChevronDown,
     ChevronUp,
     Calendar as CalendarIcon,
-    List,
-    MoreHorizontal,
     Check,
 } from 'lucide-react-native';
 
 import { usePantry, normalizeRecipe } from '../contexts/pantryContext';
 import type { MealPlan, Recipe } from '../types';
 import { recipeApi } from '../api/recipe';
-import { useNavigation } from '@react-navigation/native';
 import AppHeader from '../components/AppHeader';
-import AskAiEmptyCta from '../components/AskAiEmptyCta';
+import { DRAW_DISTANCE } from '../constants/listPerf';
 import { colors } from '../theme/tokens';
 
-const { width } = Dimensions.get('window');
-
-interface CalendarProps {
-    onBack?: () => void;
-}
-
-export default function CalendarScreen({ onBack }: CalendarProps = {}) {
+export default function CalendarScreen() {
     const { t } = useTranslation();
-    const navigation = useNavigation();
-    const handleBack = onBack || (() => navigation.goBack());
-    const { addMealPlan, deleteMealPlan, fetchAllMealPlans, fetchAllRecipes, confirmMealPlan, skipMealPlan } = usePantry();
+    const {
+        mealPlan,
+        recipes,
+        addMealPlan,
+        deleteMealPlan,
+        fetchAllMealPlans,
+        fetchAllRecipes,
+        confirmMealPlan,
+        skipMealPlan,
+    } = usePantry();
 
-    const [recipes, setRecipes] = useState<Recipe[]>([]);
-    const [mealPlans, setMealPlans] = useState<MealPlan[]>([]);
+    const planList = Array.isArray(mealPlan) ? mealPlan : [];
+    const recipeList = Array.isArray(recipes) ? recipes : [];
 
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -82,27 +80,19 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
 
     const [expandedDates, setExpandedDates] = useState<string[]>([]);
 
-    // Fetch data
+    // Fetch data into pantry context (source of truth)
     useEffect(() => {
-        (async () => {
-            const plans = await fetchAllMealPlans();
-            const recs = await fetchAllRecipes();
+        void fetchAllMealPlans();
+        void fetchAllRecipes();
+    }, [fetchAllMealPlans, fetchAllRecipes]);
 
-            setMealPlans(plans || []);
-            setRecipes(recs || []);
-        })();
-    }, []);
-
-    // ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
-    // Helpers
-    // ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
     const formatDateString = (date: Date) =>
         `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
     const getHistoryForDate = (date: Date | null) => {
         if (!date) return [];
         const dateStr = formatDateString(date);
-        return mealPlans.filter((plan) => plan.serving_date === dateStr);
+        return planList.filter((plan) => plan.serving_date === dateStr);
     };
 
     const getHistoryByType = () => {
@@ -115,9 +105,6 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
         };
     };
 
-    // ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
-    // Calendar Header + Navigation
-    // ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
     const monthNames = [
         'January',
         'February',
@@ -133,18 +120,25 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
         'December',
     ];
 
-    // ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
-    // Add Recipe Logic
-    // ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
+    const weekDates = useMemo(() => {
+        const dates: Date[] = [];
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(currentWeekStart);
+            d.setDate(currentWeekStart.getDate() + i);
+            dates.push(d);
+        }
+        return dates;
+    }, [currentWeekStart]);
+
     const handleAddMeal = async () => {
         if (!selectedRecipeId) return;
 
-        const recipe = recipes.find((r) => r.id === selectedRecipeId);
+        const recipe = recipeList.find((r) => r.id === selectedRecipeId);
         if (!recipe || !selectedDate) return;
 
         const dateStr = formatDateString(selectedDate);
 
-        const newMeal: any = {
+        const newMeal: Partial<MealPlan> = {
             recipe_id: selectedRecipeId,
             meal_name: recipe.meal_name,
             meal_type: selectedMealType,
@@ -154,13 +148,6 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
         try {
             const response = await addMealPlan(newMeal);
             if (response?.success && response.data) {
-                setMealPlans((prev) => [
-                    ...prev,
-                    {
-                        ...newMeal,
-                        id: response.data!.id,
-                    },
-                ]);
                 setShowAddModal(false);
                 setSelectedRecipeId('');
                 setSearchQuery('');
@@ -175,7 +162,6 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
 
         try {
             await deleteMealPlan(recipeToDelete.id);
-            setMealPlans((prev) => prev.filter((p) => p.id !== recipeToDelete.id));
             setShowDeleteConfirm(false);
             setRecipeToDelete(null);
         } catch (err) {
@@ -186,14 +172,11 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
     const canActOnMeal = (item: MealPlan) =>
         !item.status || item.status === 'PLANNED' || item.status === 'PENDING_CONFIRM';
 
-    const pendingMeals = mealPlans.filter((m) => m.status === 'PENDING_CONFIRM');
+    const pendingMeals = planList.filter((m) => m.status === 'PENDING_CONFIRM');
 
-    const handleConfirmMeal = async (item: MealPlan) => {
+    const handleConfirmMeal = useCallback(async (item: MealPlan) => {
         const response = await confirmMealPlan(item.id);
         if (response.success && response.data) {
-            setMealPlans((prev) =>
-                prev.map((mp) => (mp.id === item.id ? { ...mp, status: 'CONFIRMED' } : mp))
-            );
             const shortages = response.data.shortages || [];
             if (shortages.length > 0) {
                 const summary = shortages
@@ -201,34 +184,276 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                     .map((s) => `${s.name} (had ${s.available}${s.unit}, needed ${s.needed}${s.unit})`)
                     .join('\n');
                 Alert.alert(
-                    'Marked cooked � pantry shortfall',
+                    'Marked cooked - pantry shortfall',
                     `Pantry was updated (clamped at 0).\n\n${summary}\n\nYou can adjust stock in Pantry.`
                 );
             } else {
-                Alert.alert('Marked cooked', `${item.meal_name} � pantry updated.`);
+                Alert.alert('Marked cooked', `${item.meal_name} - pantry updated.`);
             }
         }
-    };
+    }, [confirmMealPlan]);
 
-    const handleSkipMeal = async (item: MealPlan) => {
+    const handleSkipMeal = useCallback(async (item: MealPlan) => {
         const response = await skipMealPlan(item.id);
         if (response.success) {
-            setMealPlans((prev) =>
-                prev.map((mp) => (mp.id === item.id ? { ...mp, status: 'SKIPPED' } : mp))
-            );
-            Alert.alert("Didn't cook", `${item.meal_name} � no pantry change.`);
+            Alert.alert("Didn't cook", `${item.meal_name} - no pantry change.`);
         }
+    }, [skipMealPlan]);
+
+    const expandedKey = useMemo(
+        () =>
+            expandedDates.slice().sort().join('|') +
+            ':' +
+            planList.map((p) => `${p.id}:${p.status}`).join(','),
+        [expandedDates, planList],
+    );
+
+    const openRecipeDetail = async (item: MealPlan) => {
+        const recipeId = String(item.recipe_id ?? '').trim();
+        let recipe = recipeList.find((r) => String(r.id) === recipeId) ?? null;
+
+        if (!recipe && recipeId) {
+            try {
+                const response = await recipeApi.get(recipeId);
+                if (response.success && response.data) {
+                    const raw = response.data as unknown;
+                    const payload = (raw && typeof raw === 'object' && 'recipe' in (raw as object)
+                        ? (raw as { recipe: Record<string, unknown> }).recipe
+                        : raw) as Record<string, unknown>;
+                    recipe = normalizeRecipe(payload);
+                }
+            } catch (err) {
+                console.error('Failed to load recipe for meal plan:', err);
+            }
+        }
+
+        setSelectedRecipeDetail(
+            recipe ?? {
+                id: recipeId,
+                meal_name: item.meal_name || 'Recipe',
+                folder_id: '',
+                instructions: [],
+                ingredients: [],
+                image: null,
+            }
+        );
+        setShowRecipeDetail(true);
     };
 
-    // ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
-    // Render
-    // ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
+    const formatDisplayDate = (d: Date) => {
+        const today = new Date();
+        if (d.toDateString() === today.toDateString()) return 'Today';
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
+        if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+        const tomorrow = new Date(today);
+        tomorrow.setDate(today.getDate() + 1);
+        if (d.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
+        return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    };
+
+    const emptyAndPendingBanner = (
+        <>
+            {planList.length === 0 && (
+                <View className="mb-4 bg-surface rounded-xl p-6 items-center border border-line">
+                    <Text className="text-muted">No meals planned</Text>
+                </View>
+            )}
+            {pendingMeals.length > 0 && (
+                <View className="mb-4 bg-sage border border-line rounded-2xl p-3">
+                    <Text className="text-sm font-semibold text-ink mb-2">
+                        {pendingMeals.length === 1
+                            ? `Did you cook ${pendingMeals[0].meal_name}?`
+                            : 'Did you cook these meals?'}
+                    </Text>
+                    {pendingMeals.map((item) => (
+                        <View
+                            key={item.id}
+                            className="flex-row items-center justify-between bg-surface rounded-xl px-3 py-2 mb-2 border border-line"
+                        >
+                            <View className="flex-1 mr-2">
+                                <Text className="font-medium text-ink" numberOfLines={1}>
+                                    {item.meal_name}
+                                </Text>
+                                <Text className="text-xs text-muted">{item.serving_date}</Text>
+                            </View>
+                            <View className="flex-row gap-2">
+                                <TouchableOpacity
+                                    onPress={() => handleConfirmMeal(item)}
+                                    className="bg-herb px-3 py-1.5 rounded-lg"
+                                >
+                                    <Text className="text-white text-xs font-medium">Mark cooked</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    onPress={() => handleSkipMeal(item)}
+                                    className="border border-line px-3 py-1.5 rounded-lg"
+                                >
+                                    <Text className="text-muted text-xs font-medium">Didn't cook</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    ))}
+                </View>
+            )}
+        </>
+    );
+
+    const weekNavHeader = (
+        <View className="mb-4">
+            {emptyAndPendingBanner}
+            <View className="flex-row justify-between items-center mb-4">
+                <TouchableOpacity
+                    onPress={() => setCurrentWeekStart((d) => {
+                        const newD = new Date(d);
+                        newD.setDate(d.getDate() - 7);
+                        return newD;
+                    })}
+                    className="flex-row items-center px-3 py-2 rounded-lg bg-surface border border-line"
+                >
+                    <ChevronLeft size={16} color={colors.muted} />
+                    <Text className="text-muted font-medium">Prev</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    onPress={() => {
+                        const today = new Date();
+                        const day = today.getDay();
+                        const diff = today.getDate() - day;
+                        const start = new Date(today);
+                        start.setDate(diff);
+                        start.setHours(0, 0, 0, 0);
+                        setCurrentWeekStart(start);
+                    }}
+                    className="px-3 py-1.5 bg-sage rounded-lg border border-line"
+                >
+                    <Text className="text-herb-deep font-medium text-sm">Today</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    onPress={() => setCurrentWeekStart((d) => {
+                        const newD = new Date(d);
+                        newD.setDate(d.getDate() + 7);
+                        return newD;
+                    })}
+                    className="flex-row items-center px-3 py-2 rounded-lg bg-surface border border-line"
+                >
+                    <Text className="text-muted font-medium">Next</Text>
+                    <ChevronRight size={16} color={colors.muted} />
+                </TouchableOpacity>
+            </View>
+
+            <Text className="text-center font-semibold text-ink mb-4">
+                {currentWeekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                {' to '}
+                {(() => {
+                    const end = new Date(currentWeekStart);
+                    end.setDate(currentWeekStart.getDate() + 6);
+                    return end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                })()}
+            </Text>
+        </View>
+    );
+
+    const renderWeekDay = useCallback(({ item: date }: { item: Date }) => {
+        const dateStr = formatDateString(date);
+        const dayMeals = planList.filter((p) => p.serving_date === dateStr);
+        const isExpanded = expandedDates.includes(dateStr);
+        const isToday = date.toDateString() === new Date().toDateString();
+
+        return (
+            <View
+                className={`mb-2 rounded-xl overflow-hidden border ${isToday ? 'border-herb' : 'border-line'} bg-surface`}
+            >
+                <TouchableOpacity
+                    onPress={() => {
+                        setExpandedDates((prev) =>
+                            prev.includes(dateStr)
+                                ? prev.filter((d) => d !== dateStr)
+                                : [...prev, dateStr],
+                        );
+                    }}
+                    className={`px-4 py-3 flex-row justify-between items-center ${dayMeals.length > 0 ? 'bg-linen' : 'bg-surface'}`}
+                >
+                    <View className="flex-row items-center">
+                        <CalendarIcon size={16} color={colors.muted} />
+                        <Text className={`ml-2 font-medium ${isToday ? 'text-herb' : 'text-ink'}`}>
+                            {formatDisplayDate(date)}
+                        </Text>
+                        {dayMeals.length > 0 && (
+                            <View className="bg-sage rounded-full px-2 py-0.5 ml-2">
+                                <Text className="text-herb-deep text-xs font-medium">{dayMeals.length}</Text>
+                            </View>
+                        )}
+                    </View>
+                    {dayMeals.length > 0 && (
+                        isExpanded ? <ChevronUp size={18} color={colors.muted} /> : <ChevronDown size={18} color={colors.muted} />
+                    )}
+                </TouchableOpacity>
+
+                {isExpanded && dayMeals.length > 0 && (
+                    <View className="border-t border-line">
+                        {dayMeals.map((meal) => (
+                            <View
+                                key={meal.id}
+                                className="px-4 py-3 flex-row justify-between items-center border-b border-line"
+                            >
+                                <View className="flex-row items-center flex-1">
+                                    <View className={`w-2 h-2 rounded-full mr-3 ${meal.meal_type === 'breakfast' ? 'bg-sage' :
+                                        meal.meal_type === 'lunch' ? 'bg-herb' :
+                                            meal.meal_type === 'dinner' ? 'bg-herb-deep' : 'bg-muted'
+                                        }`} />
+                                    <View className="flex-1">
+                                        <Text className="font-medium text-ink">{meal.meal_name}</Text>
+                                        <Text className="text-xs text-muted capitalize">{meal.meal_type}</Text>
+                                    </View>
+                                </View>
+                                <View className="flex-row items-center">
+                                    {canActOnMeal(meal) && (
+                                        <>
+                                            <TouchableOpacity onPress={() => handleConfirmMeal(meal)} className="p-2">
+                                                <Check size={16} color={colors.herb} />
+                                            </TouchableOpacity>
+                                            <TouchableOpacity onPress={() => handleSkipMeal(meal)} className="p-2">
+                                                <X size={16} color={colors.muted} />
+                                            </TouchableOpacity>
+                                        </>
+                                    )}
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setRecipeToDelete(meal);
+                                            setShowDeleteConfirm(true);
+                                        }}
+                                        className="p-2"
+                                    >
+                                        <Trash2 size={16} color={colors.danger} />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        ))}
+                    </View>
+                )}
+
+                <TouchableOpacity
+                    onPress={() => {
+                        setSelectedDate(date);
+                        setShowAddModal(true);
+                    }}
+                    className="py-2 bg-linen border-t border-line"
+                >
+                    <View className="flex-row items-center justify-center">
+                        <Plus size={14} color={colors.herb} />
+                        <Text className="text-herb font-medium ml-1 text-sm">Add meal</Text>
+                    </View>
+                </TouchableOpacity>
+            </View>
+        );
+    }, [planList, expandedDates, handleConfirmMeal, handleSkipMeal]);
+
     return (
         <View className="flex-1 bg-linen">
             <AppHeader
                 title={t('calendar.title')}
-                showBackButton
-                onBack={handleBack}
+                showMenuButton
                 rightElement={<Plus size={24} color={colors.ink} />}
                 onRightPress={() => {
                     setSelectedDate(new Date());
@@ -265,59 +490,10 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                 </View>
             </View>
 
-            <ScrollView className="flex-1 px-4 pt-3">
-                {mealPlans.length === 0 && (
-                    <View className="mb-4 bg-surface rounded-xl p-6 items-center border border-line">
-                        <Text className="text-muted">No meals planned</Text>
-                        <AskAiEmptyCta
-                            hint="Skip the forms � just tell the AI what you need."
-                            label="Ask AI to plan this week"
-                            onPress={() =>
-                                navigation.navigate(
-                                    'AICookingAssistant' as never,
-                                    { initialPrompt: 'Plan dinners for the rest of this week' } as never,
-                                )
-                            }
-                        />
-                    </View>
-                )}
-                {pendingMeals.length > 0 && (
-                    <View className="mb-4 bg-sage border border-line rounded-2xl p-3">
-                        <Text className="text-sm font-semibold text-ink mb-2">
-                            {pendingMeals.length === 1
-                                ? `Did you cook ${pendingMeals[0].meal_name}?`
-                                : 'Did you cook these meals?'}
-                        </Text>
-                        {pendingMeals.map((item) => (
-                            <View
-                                key={item.id}
-                                className="flex-row items-center justify-between bg-surface rounded-xl px-3 py-2 mb-2 border border-line"
-                            >
-                                <View className="flex-1 mr-2">
-                                    <Text className="font-medium text-ink" numberOfLines={1}>
-                                        {item.meal_name}
-                                    </Text>
-                                    <Text className="text-xs text-muted">{item.serving_date}</Text>
-                                </View>
-                                <View className="flex-row gap-2">
-                                    <TouchableOpacity
-                                        onPress={() => handleConfirmMeal(item)}
-                                        className="bg-herb px-3 py-1.5 rounded-lg"
-                                    >
-                                        <Text className="text-white text-xs font-medium">Mark cooked</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        onPress={() => handleSkipMeal(item)}
-                                        className="border border-line px-3 py-1.5 rounded-lg"
-                                    >
-                                        <Text className="text-muted text-xs font-medium">Didn't cook</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-                        ))}
-                    </View>
-                )}
-                {viewMode === 'calendar' && (
+            {viewMode === 'calendar' ? (
+                <ScrollView className="flex-1 px-4 pt-3">
+                    {emptyAndPendingBanner}
+
                     <>
                         {/* Month Navigation */}
                         <View className="flex-row justify-between items-center mb-4">
@@ -368,262 +544,70 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                             }}
                         />
                     </>
-                )}
 
-                {/* Selected Day Content - Calendar View */}
-                {viewMode === 'calendar' && selectedDate && (
-                    <View className="mt-5 bg-surface rounded-2xl p-4 mb-8 border border-line shadow-sm">
-                        <View className="flex-row justify-between items-center mb-4">
-                            <Text className="text-lg font-bold text-ink">
-                                {selectedDate.toLocaleDateString('en-US', {
-                                    weekday: 'long',
-                                    month: 'long',
-                                    day: 'numeric',
-                                })}
-                            </Text>
+                    {/* Selected Day Content - Calendar View */}
+                    {selectedDate && (
+                        <View className="mt-5 bg-surface rounded-2xl p-4 mb-8 border border-line shadow-sm">
+                            <View className="flex-row justify-between items-center mb-4">
+                                <Text className="text-lg font-bold text-ink">
+                                    {selectedDate.toLocaleDateString('en-US', {
+                                        weekday: 'long',
+                                        month: 'long',
+                                        day: 'numeric',
+                                    })}
+                                </Text>
 
-                            <TouchableOpacity
-                                onPress={() => setShowAddModal(true)}
-                                className="bg-herb px-4 py-2 rounded-xl"
-                            >
-                                <Text className="text-white font-medium">+ Add</Text>
-                            </TouchableOpacity>
-                        </View>
+                                <TouchableOpacity
+                                    onPress={() => setShowAddModal(true)}
+                                    className="bg-herb px-4 py-2 rounded-xl"
+                                >
+                                    <Text className="text-white font-medium">+ Add</Text>
+                                </TouchableOpacity>
+                            </View>
 
-                        {(() => {
-                            const byType = getHistoryByType();
-                            const types = ['breakfast', 'lunch', 'dinner', 'snack'] as const;
-
-                            return types.map((type) =>
-                                byType[type].length > 0 ? (
-                                    <View key={type} className="mb-5">
-                                        <Text className="text-base font-semibold mb-2 capitalize text-ink">
-                                            {type}
-                                        </Text>
-
-                                        {byType[type].map((item) => (
-                                            <TouchableOpacity
-                                                key={item.id}
-                                                onPress={async () => {
-                                                    const recipeId = String(item.recipe_id ?? '').trim();
-                                                    let recipe = recipes.find((r) => String(r.id) === recipeId) ?? null;
-
-                                                    if (!recipe && recipeId) {
-                                                        try {
-                                                            const response = await recipeApi.get(recipeId);
-                                                            if (response.success && response.data) {
-                                                                const raw = response.data as unknown;
-                                                                const payload = (raw && typeof raw === 'object' && 'recipe' in (raw as object)
-                                                                    ? (raw as { recipe: Record<string, unknown> }).recipe
-                                                                    : raw) as Record<string, unknown>;
-                                                                recipe = normalizeRecipe(payload);
-                                                                setRecipes((prev) =>
-                                                                    prev.some((r) => r.id === recipe!.id) ? prev : [...prev, recipe!]
-                                                                );
-                                                            }
-                                                        } catch (err) {
-                                                            console.error('Failed to load recipe for meal plan:', err);
-                                                        }
-                                                    }
-
-                                                    setSelectedRecipeDetail(
-                                                        recipe ?? {
-                                                            id: recipeId,
-                                                            meal_name: item.meal_name || 'Recipe',
-                                                            folder_id: '',
-                                                            instructions: [],
-                                                            ingredients: [],
-                                                            image: null,
-                                                        }
-                                                    );
-                                                    setShowRecipeDetail(true);
-                                                }}
-                                                className="bg-linen p-4 rounded-xl mb-2.5 border border-line"
-                                            >
-                                                <View className="flex-row justify-between items-center">
-                                                    <View className="flex-1 mr-2">
-                                                        <Text className="font-medium text-ink">{item.meal_name}</Text>
-                                                        {item.status && item.status !== 'PLANNED' && (
-                                                            <Text className="text-xs text-muted mt-0.5">
-                                                                {item.status === 'PENDING_CONFIRM' && 'Waiting: did you cook this?'}
-                                                                {item.status === 'CONFIRMED' && 'Cooked'}
-                                                                {item.status === 'SKIPPED' && "Didn't cook"}
-                                                            </Text>
-                                                        )}
-                                                    </View>
-
-                                                    <View className="flex-row items-center">
-                                                        {canActOnMeal(item) && (
-                                                            <>
-                                                                <TouchableOpacity
-                                                                    onPress={() => handleConfirmMeal(item)}
-                                                                    className="p-2 mr-1"
-                                                                >
-                                                                    <Check size={20} color={colors.herb} />
-                                                                </TouchableOpacity>
-                                                                <TouchableOpacity
-                                                                    onPress={() => handleSkipMeal(item)}
-                                                                    className="p-2 mr-1"
-                                                                >
-                                                                    <X size={20} color={colors.muted} />
-                                                                </TouchableOpacity>
-                                                            </>
-                                                        )}
-                                                        <TouchableOpacity
-                                                            onPress={() => {
-                                                                setRecipeToDelete(item);
-                                                                setShowDeleteConfirm(true);
-                                                            }}
-                                                        >
-                                                            <Trash2 size={20} color={colors.danger} />
-                                                        </TouchableOpacity>
-                                                    </View>
-                                                </View>
-                                            </TouchableOpacity>
-                                        ))}
-                                    </View>
-                                ) : null
-                            );
-                        })()}
-                    </View>
-                )}
-
-                {/* ?�?�?�?�?�?�?�?�?�?�?�?�?�?� WEEK / LIST VIEW ?�?�?�?�?�?�?�?�?�?�?�?�?�?� */}
-                {viewMode === 'list' && (
-                    <View className="mb-10">
-                        {/* Week Navigation */}
-                        <View className="flex-row justify-between items-center mb-4">
-                            <TouchableOpacity
-                                onPress={() => setCurrentWeekStart((d) => {
-                                    const newD = new Date(d);
-                                    newD.setDate(d.getDate() - 7);
-                                    return newD;
-                                })}
-                                className="flex-row items-center px-3 py-2 rounded-lg bg-surface border border-line"
-                            >
-                                <ChevronLeft size={16} color={colors.muted} />
-                                <Text className="text-muted font-medium">Prev</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                onPress={() => {
-                                    const today = new Date();
-                                    const day = today.getDay();
-                                    const diff = today.getDate() - day;
-                                    const start = new Date(today);
-                                    start.setDate(diff);
-                                    start.setHours(0, 0, 0, 0);
-                                    setCurrentWeekStart(start);
-                                }}
-                                className="px-3 py-1.5 bg-sage rounded-lg border border-line"
-                            >
-                                <Text className="text-herb-deep font-medium text-sm">Today</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                onPress={() => setCurrentWeekStart((d) => {
-                                    const newD = new Date(d);
-                                    newD.setDate(d.getDate() + 7);
-                                    return newD;
-                                })}
-                                className="flex-row items-center px-3 py-2 rounded-lg bg-surface border border-line"
-                            >
-                                <Text className="text-muted font-medium">Next</Text>
-                                <ChevronRight size={16} color={colors.muted} />
-                            </TouchableOpacity>
-                        </View>
-
-                        <Text className="text-center font-semibold text-ink mb-4">
-                            {currentWeekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ?�{' '}
                             {(() => {
-                                const end = new Date(currentWeekStart);
-                                end.setDate(currentWeekStart.getDate() + 6);
-                                return end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                            })()}
-                        </Text>
+                                const byType = getHistoryByType();
+                                const types = ['breakfast', 'lunch', 'dinner', 'snack'] as const;
 
-                        {/* Week Days List */}
-                        {(() => {
-                            const weekDates: Date[] = [];
-                            for (let i = 0; i < 7; i++) {
-                                const d = new Date(currentWeekStart);
-                                d.setDate(currentWeekStart.getDate() + i);
-                                weekDates.push(d);
-                            }
-                            return weekDates.map((date) => {
-                                const dateStr = formatDateString(date);
-                                const dayMeals = mealPlans.filter((p) => p.serving_date === dateStr);
-                                const isExpanded = expandedDates.includes(dateStr);
-                                const isToday = date.toDateString() === new Date().toDateString();
+                                return types.map((type) =>
+                                    byType[type].length > 0 ? (
+                                        <View key={type} className="mb-5">
+                                            <Text className="text-base font-semibold mb-2 capitalize text-ink">
+                                                {type}
+                                            </Text>
 
-                                const formatDisplayDate = (d: Date) => {
-                                    const today = new Date();
-                                    if (d.toDateString() === today.toDateString()) return 'Today';
-                                    const yesterday = new Date(today);
-                                    yesterday.setDate(today.getDate() - 1);
-                                    if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
-                                    const tomorrow = new Date(today);
-                                    tomorrow.setDate(today.getDate() + 1);
-                                    if (d.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
-                                    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-                                };
-
-                                return (
-                                    <View
-                                        key={dateStr}
-                                        className={`mb-2 rounded-xl overflow-hidden border ${isToday ? 'border-herb' : 'border-line'} bg-surface`}
-                                    >
-                                        <TouchableOpacity
-                                            onPress={() => {
-                                                if (isExpanded) {
-                                                    setExpandedDates(expandedDates.filter((d) => d !== dateStr));
-                                                } else {
-                                                    setExpandedDates([...expandedDates, dateStr]);
-                                                }
-                                            }}
-                                            className={`px-4 py-3 flex-row justify-between items-center ${dayMeals.length > 0 ? 'bg-linen' : 'bg-surface'}`}
-                                        >
-                                            <View className="flex-row items-center">
-                                                <CalendarIcon size={16} color={colors.muted} />
-                                                <Text className={`ml-2 font-medium ${isToday ? 'text-herb' : 'text-ink'}`}>
-                                                    {formatDisplayDate(date)}
-                                                </Text>
-                                                {dayMeals.length > 0 && (
-                                                    <View className="bg-sage rounded-full px-2 py-0.5 ml-2">
-                                                        <Text className="text-herb-deep text-xs font-medium">{dayMeals.length}</Text>
-                                                    </View>
-                                                )}
-                                            </View>
-                                            {dayMeals.length > 0 && (
-                                                isExpanded ? <ChevronUp size={18} color={colors.muted} /> : <ChevronDown size={18} color={colors.muted} />
-                                            )}
-                                        </TouchableOpacity>
-
-                                        {isExpanded && dayMeals.length > 0 && (
-                                            <View className="border-t border-line">
-                                                {dayMeals.map((item) => (
-                                                    <View
-                                                        key={item.id}
-                                                        className="px-4 py-3 flex-row justify-between items-center border-b border-line"
-                                                    >
-                                                        <View className="flex-row items-center flex-1">
-                                                            <View className={`w-2 h-2 rounded-full mr-3 ${item.meal_type === 'breakfast' ? 'bg-sage' :
-                                                                    item.meal_type === 'lunch' ? 'bg-herb' :
-                                                                        item.meal_type === 'dinner' ? 'bg-herb-deep' : 'bg-muted'
-                                                                }`} />
-                                                            <View className="flex-1">
-                                                                <Text className="font-medium text-ink">{item.meal_name}</Text>
-                                                                <Text className="text-xs text-muted capitalize">{item.meal_type}</Text>
-                                                            </View>
+                                            {byType[type].map((item) => (
+                                                <TouchableOpacity
+                                                    key={item.id}
+                                                    onPress={() => openRecipeDetail(item)}
+                                                    className="bg-linen p-4 rounded-xl mb-2.5 border border-line"
+                                                >
+                                                    <View className="flex-row justify-between items-center">
+                                                        <View className="flex-1 mr-2">
+                                                            <Text className="font-medium text-ink">{item.meal_name}</Text>
+                                                            {item.status && item.status !== 'PLANNED' && (
+                                                                <Text className="text-xs text-muted mt-0.5">
+                                                                    {item.status === 'PENDING_CONFIRM' && 'Waiting: did you cook this?'}
+                                                                    {item.status === 'CONFIRMED' && 'Cooked'}
+                                                                    {item.status === 'SKIPPED' && "Didn't cook"}
+                                                                </Text>
+                                                            )}
                                                         </View>
+
                                                         <View className="flex-row items-center">
                                                             {canActOnMeal(item) && (
                                                                 <>
-                                                                    <TouchableOpacity onPress={() => handleConfirmMeal(item)} className="p-2">
-                                                                        <Check size={16} color={colors.herb} />
+                                                                    <TouchableOpacity
+                                                                        onPress={() => handleConfirmMeal(item)}
+                                                                        className="p-2 mr-1"
+                                                                    >
+                                                                        <Check size={20} color={colors.herb} />
                                                                     </TouchableOpacity>
-                                                                    <TouchableOpacity onPress={() => handleSkipMeal(item)} className="p-2">
-                                                                        <X size={16} color={colors.muted} />
+                                                                    <TouchableOpacity
+                                                                        onPress={() => handleSkipMeal(item)}
+                                                                        className="p-2 mr-1"
+                                                                    >
+                                                                        <X size={20} color={colors.muted} />
                                                                     </TouchableOpacity>
                                                                 </>
                                                             )}
@@ -632,39 +616,35 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                                                                     setRecipeToDelete(item);
                                                                     setShowDeleteConfirm(true);
                                                                 }}
-                                                                className="p-2"
                                                             >
-                                                                <Trash2 size={16} color={colors.danger} />
+                                                                <Trash2 size={20} color={colors.danger} />
                                                             </TouchableOpacity>
                                                         </View>
                                                     </View>
-                                                ))}
-                                            </View>
-                                        )}
-
-                                        <TouchableOpacity
-                                            onPress={() => {
-                                                setSelectedDate(date);
-                                                setShowAddModal(true);
-                                            }}
-                                            className="py-2 bg-linen border-t border-line"
-                                        >
-                                            <View className="flex-row items-center justify-center">
-                                                <Plus size={14} color={colors.herb} />
-                                                <Text className="text-herb font-medium ml-1 text-sm">Add meal</Text>
-                                            </View>
-                                        </TouchableOpacity>
-                                    </View>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                    ) : null
                                 );
-                            });
-                        })()}
-                    </View>
-                )}
-            </ScrollView>
+                            })()}
+                        </View>
+                    )}
+                </ScrollView>
+            ) : (
+                <View className="flex-1 px-4 pt-3">
+                    <FlashList
+                        data={weekDates}
+                        keyExtractor={(date) => formatDateString(date)}
+                        renderItem={renderWeekDay}
+                        ListHeaderComponent={weekNavHeader}
+                        extraData={expandedKey}
+                        drawDistance={DRAW_DISTANCE}
+                        contentContainerStyle={{ paddingBottom: 40 }}
+                    />
+                </View>
+            )}
 
-            {/* ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
-          ADD RECIPE BOTTOM MODAL
-      ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?� */}
+            {/* ADD RECIPE BOTTOM MODAL */}
             <Modal
                 visible={showAddModal}
                 transparent
@@ -715,9 +695,8 @@ export default function CalendarScreen({ onBack }: CalendarProps = {}) {
                             <Search size={20} color={colors.muted} className="absolute left-3 top-3.5" />
                         </View>
 
-                        {/* Recipe list - can be improved with FlatList */}
                         <ScrollView className="max-h-64 mb-6">
-                            {recipes
+                            {recipeList
                                 .filter((r) => r.meal_name?.toLowerCase().includes(searchQuery.toLowerCase()))
                                 .map((recipe) => (
                                     <TouchableOpacity

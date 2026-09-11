@@ -2,7 +2,7 @@
   "expo": {
     "scheme": "lardermind",
     "name": "LarderMind",
-    "slug": "PantryApp",
+    "slug": "lardermind",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -35,7 +35,17 @@
     },
     "plugins": [
       "react-native-iap",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-dev-client",
+        {
+          "launchMode": "most-recent",
+          "skipOnboarding": true,
+          "showMenuAtLaunch": false,
+          "embeddedBundle": true
+        }
+      ],
+      "expo-secure-store"
     ],
     "extra": {
       "eas": {

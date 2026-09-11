@@ -52,10 +52,6 @@ export default function SettingsScreen() {
 
   const handleLogout = async () => {
     await logout();
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Auth' as never }],
-    });
   };
 
   const applyLanguage = async (lng: AppLanguage) => {
@@ -113,7 +109,7 @@ export default function SettingsScreen() {
 
   return (
     <View className="flex-1 bg-linen">
-      <AppHeader title={t('settings.title')} showBackButton />
+            <AppHeader title={t('settings.title')} showMenuButton />
       <ScrollView className="flex-1">
         <View className="p-4">
           <View className="bg-surface rounded-xl overflow-hidden border border-line">

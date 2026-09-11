@@ -1,0 +1,15 @@
+# Legacy: bottom tabs removed — open last drawer destinations via menu.
+appId: com.lardermind.app
+---
+- stopApp
+- runFlow:
+    file: subflows/connect-dev-server.yaml
+- runFlow:
+    file: subflows/login.yaml
+- tapOn:
+    id: "header-menu"
+- tapOn:
+    id: "drawer-settings"
+- extendedWaitUntil:
+    visible: "Settings"
+    timeout: 10000

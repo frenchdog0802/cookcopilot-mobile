@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { PlusIcon, MinusIcon, TrashIcon } from 'lucide-react-native';
 import { QuantityLabel } from '../UnitSelect';
 import type { MeasurementSystem } from '../../utils/units';
@@ -22,18 +22,28 @@ function PantryItemRowComponent({
   return (
     <View className="flex-row items-center p-3 bg-surface rounded-xl mb-2 border border-line">
       <View className="flex-1 mr-3">
-        <Text className="font-semibold text-ink capitalize" numberOfLines={1}>
+        <Text
+          className="font-semibold text-ink capitalize"
+          numberOfLines={1}
+          style={{ color: colors.ink }}
+        >
           {item.name}
         </Text>
       </View>
 
-      <View className="flex-row items-center mr-2">
-        <TouchableOpacity
+      <View className="flex-row items-center gap-1.5 mr-2" style={{ flexShrink: 0 }}>
+        <Pressable
           onPress={() => onUpdateQuantity(item, -0.5)}
-          className="bg-linen p-2 rounded-lg border border-line"
+          style={{
+            backgroundColor: colors.linen,
+            padding: 8,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: colors.line,
+          }}
         >
           <MinusIcon size={16} color={colors.ink} />
-        </TouchableOpacity>
+        </Pressable>
 
         <QuantityLabel
           quantity={item.quantity}
@@ -42,20 +52,27 @@ function PantryItemRowComponent({
           baseUnit={item.base_unit}
           defaultDisplayUnit={item.default_display_unit}
           measurementSystem={measurementSystem}
-          style={{ width: 72, textAlign: 'center', fontWeight: '700', fontSize: 14 }}
+          style={{
+            minWidth: 72,
+            textAlign: 'center',
+            fontWeight: '700',
+            fontSize: 14,
+            paddingHorizontal: 4,
+            color: colors.ink,
+          }}
         />
 
-        <TouchableOpacity
+        <Pressable
           onPress={() => onUpdateQuantity(item, 0.5)}
-          className="bg-herb p-2 rounded-lg"
+          style={{ backgroundColor: colors.herb, padding: 8, borderRadius: 8 }}
         >
           <PlusIcon size={16} color={colors.onHerb} />
-        </TouchableOpacity>
+        </Pressable>
       </View>
 
-      <TouchableOpacity onPress={() => onRemove(item.id)} className="p-2">
+      <Pressable onPress={() => onRemove(item.id)} style={{ padding: 8 }}>
         <TrashIcon size={18} color={colors.danger} />
-      </TouchableOpacity>
+      </Pressable>
     </View>
   );
 }

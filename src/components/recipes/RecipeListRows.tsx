@@ -34,6 +34,7 @@ function FolderRowComponent({
 }: FolderRowProps) {
   return (
     <TouchableOpacity
+      testID={`folder-row-${folder.id}`}
       onPress={() => onOpen(folder)}
       className="bg-surface rounded-xl p-4 mb-3 border border-line"
     >

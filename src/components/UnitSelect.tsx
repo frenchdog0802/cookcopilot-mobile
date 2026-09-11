@@ -1,5 +1,5 @@
-import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useMemo } from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import {
   UnitKind,
   MeasurementSystem,
@@ -32,27 +32,35 @@ export function UnitSelect({
 }: UnitSelectProps) {
   const resolvedKind = (kind as UnitKind | undefined) || undefined;
 
-  let options: string[];
-  if (!resolvedKind) {
-    options = preferSystemUnits
-      ? [
-          ...displayUnitsForPreference('weight', measurementSystem),
-          ...displayUnitsForPreference('volume', measurementSystem),
-          ...COUNT_UNITS,
-        ]
-      : [...WEIGHT_UNITS, ...VOLUME_UNITS, ...COUNT_UNITS];
-  } else if (preferSystemUnits && resolvedKind !== 'count') {
-    options = displayUnitsForPreference(resolvedKind, measurementSystem);
-  } else {
-    options = allowedUnits(resolvedKind);
-  }
+  const options = useMemo(() => {
+    if (!resolvedKind) {
+      // Unknown ingredient: allow any common unit (parity with web UnitSelect)
+      return preferSystemUnits
+        ? [
+            ...displayUnitsForPreference('weight', measurementSystem),
+            ...displayUnitsForPreference('volume', measurementSystem),
+            ...COUNT_UNITS,
+          ]
+        : [...WEIGHT_UNITS, ...VOLUME_UNITS, ...COUNT_UNITS];
+    }
+    if (preferSystemUnits && resolvedKind !== 'count') {
+      return displayUnitsForPreference(resolvedKind, measurementSystem);
+    }
+    return allowedUnits(resolvedKind);
+  }, [resolvedKind, preferSystemUnits, measurementSystem]);
 
-  const current = value || options[0] || '';
-  const opts = options.includes(current) ? options : [current, ...options];
+  // Never keep a mismatched unit (e.g. pcs) selectable when kind is known
+  const current = options.includes(value) ? value : options[0] || '';
+
+  useEffect(() => {
+    if (enabled && value && options.length > 0 && !options.includes(value) && current) {
+      onChange(current);
+    }
+  }, [enabled, value, current, options, onChange]);
 
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-      {opts.map(u => {
+      {options.map(u => {
         const selected = u === current;
         return (
           <TouchableOpacity
@@ -115,7 +123,7 @@ export function preferredUnitForIngredient(
   measurementSystem: MeasurementSystem = 'metric',
 ): { kind: UnitKind | undefined; unit: string } {
   if (!ingredient) {
-    return { kind: undefined, unit: '' };
+    return { kind: 'count', unit: 'pcs' };
   }
   const hasHint =
     ingredient.unit_kind ||
@@ -123,7 +131,7 @@ export function preferredUnitForIngredient(
     ingredient.default_unit ||
     ingredient.default_display_unit;
   if (!hasHint) {
-    return { kind: undefined, unit: '' };
+    return { kind: 'count', unit: 'pcs' };
   }
 
   const resolved = resolveIngredientUnits(ingredient);
@@ -141,7 +149,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     paddingVertical: 2,
   },
   chip: {

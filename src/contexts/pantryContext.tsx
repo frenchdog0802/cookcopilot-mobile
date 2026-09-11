@@ -1,4 +1,4 @@
-import React, { useState, createContext, useContext, useCallback, useEffect } from 'react';
+import React, { useState, createContext, useContext, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
     PantryItem,
     ShoppingListItem,
@@ -33,7 +33,36 @@ import {
     saveQueue,
     saveSnapshot,
     subscribeConnectivity,
+    createSerialQueue,
+    applyItemUpdate,
+    applyItemRemove,
+    applyMarkAllChecked,
+    enqueueMarkAllUpdates,
 } from '../services/shoppingListOffline';
+import {
+    enrichPantryNames,
+    enrichShoppingNames,
+} from '../utils/fillMissingNames';
+
+type ResourceLoading = {
+    recipes: boolean;
+    pantry: boolean;
+    shopping: boolean;
+    mealPlan: boolean;
+    ingredients: boolean;
+};
+
+const DEFAULT_RESOURCE_LOADING: ResourceLoading = {
+    recipes: false,
+    pantry: false,
+    shopping: false,
+    mealPlan: false,
+    ingredients: false,
+};
+
+function asList<T>(value: unknown): T[] {
+    return Array.isArray(value) ? value : [];
+}
 
 function unwrapListResponse<T>(data: T[] | Record<string, T[] | undefined>, key: string): T[] {
     if (Array.isArray(data)) return data;
@@ -79,6 +108,12 @@ function normalizeRecipeImage(raw: unknown): Recipe['image'] {
 
 export function normalizeRecipe(raw: Record<string, unknown> | Recipe): Recipe {
     const r = raw as Record<string, unknown>;
+    const imageUrl =
+        typeof r.image_url === 'string'
+            ? r.image_url
+            : typeof r.imageUrl === 'string'
+              ? r.imageUrl
+              : '';
     return {
         id: String(r.id ?? ''),
         meal_name: String(r.meal_name ?? r.mealName ?? ''),
@@ -87,7 +122,9 @@ export function normalizeRecipe(raw: Record<string, unknown> | Recipe): Recipe {
             : '',
         instructions: normalizeInstructions(r.instructions, r.steps),
         ingredients: Array.isArray(r.ingredients) ? (r.ingredients as Recipe['ingredients']) : [],
-        image: normalizeRecipeImage(r.image),
+        image:
+            normalizeRecipeImage(r.image) ??
+            (imageUrl ? { url: imageUrl, public_id: String(r.image_public_id ?? r.imagePublicId ?? '') } : null),
     };
 }
 
@@ -112,13 +149,32 @@ function normalizeMealPlan(raw: Record<string, unknown> | MealPlan): MealPlan {
 /** Backend expects instructions as a single string. */
 function serializeRecipeForApi(recipe: Partial<Recipe>): Record<string, unknown> {
     const instructions = recipe.instructions;
-    return {
-        ...recipe,
+    const ingredients = (recipe.ingredients ?? [])
+        .filter((ing) => ing.name?.trim())
+        .map((ing) => ({
+            name: ing.name.trim(),
+            quantity: Number(ing.quantity) || 1,
+            unit: ing.unit?.trim() || undefined,
+            ingredient_id: ing.ingredient_id,
+        }));
+
+    const payload: Record<string, unknown> = {
+        meal_name: recipe.meal_name?.trim(),
         instructions: Array.isArray(instructions)
             ? instructions.filter(Boolean).join('\n')
             : instructions ?? '',
-        image: recipe.image?.url ? recipe.image : null,
+        ingredients,
     };
+
+    if (recipe.folder_id?.trim()) {
+        payload.folder_id = recipe.folder_id.trim();
+    }
+
+    if (recipe.image?.url) {
+        payload.image_url = recipe.image.url;
+    }
+
+    return payload;
 }
 
 interface PantryContextType {
@@ -159,6 +215,7 @@ interface PantryContextType {
     updateShoppingListItem: (item: ShoppingListItem) => Promise<ApiResponse<ShoppingListItem>>;
     addShoppingListItem: (item: Partial<ShoppingListItem>) => Promise<ApiResponse<ShoppingListItem>>;
     removeShoppingListItem: (id: string) => Promise<void>;
+    markAllShoppingListChecked: () => Promise<number>;
     retryShoppingListSync: () => Promise<void>;
 
     // Meal plans
@@ -170,8 +227,9 @@ interface PantryContextType {
     confirmMealPlan: (id: string) => Promise<ApiResponse<ConfirmMealPlanResult>>;
     skipMealPlan: (id: string) => Promise<ApiResponse<{ mealPlan: MealPlan; alreadySkipped: boolean }>>;
 
-    // Loading state
+    /** True if any resource fetch is in flight */
     loading: boolean;
+    loadingByResource: ResourceLoading;
 }
 
 const PantryContext = createContext<PantryContextType | undefined>(undefined);
@@ -184,9 +242,12 @@ const DEFAULT_FOLDERS: Folder[] = [
 export function PantryProvider({ children }: { children: React.ReactNode }) {
     const { user } = useAuth();
     const userId = user?.id ?? '';
-    const [loading, setLoading] = useState(false);
+    const [loadingByResource, setLoadingByResource] = useState<ResourceLoading>(DEFAULT_RESOURCE_LOADING);
+    const loading = Object.values(loadingByResource).some(Boolean);
     const [mealPlan, setMealPlan] = useState<MealPlan[]>([]);
     const [ingredients, setIngredients] = useState<IngredientEntry[]>([]);
+    const ingredientsRef = useRef(ingredients);
+    ingredientsRef.current = ingredients;
     const [folders, setFolders] = useState<Folder[]>(DEFAULT_FOLDERS);
     const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
     const [shoppingList, setShoppingList] = useState<ShoppingListItem[]>([]);
@@ -199,16 +260,24 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
         measurement_unit: 'metric',
     });
 
+    const setResourceLoading = useCallback((key: keyof ResourceLoading, value: boolean) => {
+        setLoadingByResource((prev) => (prev[key] === value ? prev : { ...prev, [key]: value }));
+    }, []);
+
     const updateSyncStatus = useCallback((patch: Partial<ShoppingListSyncStatus>) => {
         setShoppingListSyncStatus((prev) => ({ ...prev, ...patch }));
     }, []);
+
+    const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const shoppingWriteRef = useRef(createSerialQueue());
+    const isOnlineRef = useRef(shoppingListSyncStatus.isOnline);
+    isOnlineRef.current = shoppingListSyncStatus.isOnline;
 
     const runFlush = useCallback(async () => {
         if (!userId) return;
         updateSyncStatus({ isSyncing: true });
         const result = await flushShoppingListQueue(userId, {
-            onItems: (items) => setShoppingList(items),
-            onQueue: (mutations) => updateSyncStatus({ pendingCount: mutations.length }),
+            onItems: (items) => setShoppingList(Array.isArray(items) ? items : []),
         });
         updateSyncStatus({
             isSyncing: false,
@@ -217,9 +286,27 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
             ...(result.ok && result.remaining === 0 ? { lastSyncedAt: Date.now() } : {}),
         });
         if (result.items) {
-            setShoppingList(result.items);
+            setShoppingList(Array.isArray(result.items) ? result.items : []);
         }
     }, [userId, updateSyncStatus]);
+
+    const scheduleFlush = useCallback(() => {
+        if (flushTimerRef.current) {
+            clearTimeout(flushTimerRef.current);
+        }
+        flushTimerRef.current = setTimeout(() => {
+            flushTimerRef.current = null;
+            void runFlush();
+        }, 400);
+    }, [runFlush]);
+
+    useEffect(() => {
+        return () => {
+            if (flushTimerRef.current) {
+                clearTimeout(flushTimerRef.current);
+            }
+        };
+    }, []);
 
     useEffect(() => {
         let cancelled = false;
@@ -230,7 +317,11 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
         const unsubscribe = subscribeConnectivity((online) => {
             updateSyncStatus({ isOnline: online });
             if (online && userId) {
-                void runFlush();
+                void loadQueue(userId).then((queue) => {
+                    if (queue.length > 0) {
+                        void runFlush();
+                    }
+                });
             }
         });
         return () => {
@@ -250,7 +341,7 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
             const cached = await loadSnapshot(userId);
             const queue = await loadQueue(userId);
             if (cancelled) return;
-            setShoppingList(cached);
+            setShoppingList(asList(cached));
             updateSyncStatus({ pendingCount: queue.length });
         })();
         return () => {
@@ -261,6 +352,7 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         let cancelled = false;
         (async () => {
+            if (!userId) return;
             try {
                 const prefs = await userPreferencesApi.get();
                 if (!cancelled && prefs?.measurementUnit) {
@@ -276,11 +368,11 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [userId]);
 
     // === FOLDER FUNCTIONS ===
     const fetchAllFolders = useCallback(async () => {
-        setLoading(true);
+        setResourceLoading('recipes', true);
         try {
             const response = await folderApi.list();
             if (response.success && response.data) {
@@ -293,9 +385,9 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
         } catch (error) {
             console.error('Failed to fetch folders:', error);
         } finally {
-            setLoading(false);
+            setResourceLoading('recipes', false);
         }
-    }, []);
+    }, [setResourceLoading]);
 
     const addFolder = useCallback(async (folder: Partial<Folder>): Promise<ApiResponse<Folder>> => {
         const response = await folderApi.create(folder);
@@ -333,7 +425,7 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
 
     // === RECIPE FUNCTIONS ===
     const fetchAllRecipes = useCallback(async (): Promise<Recipe[]> => {
-        setLoading(true);
+        setResourceLoading('recipes', true);
         try {
             const response = await recipeApi.list();
             if (response.success && response.data) {
@@ -341,16 +433,16 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
                 const recipesList = unwrapListResponse(data, 'recipes').map((recipe) =>
                     normalizeRecipe(recipe as unknown as Record<string, unknown>)
                 );
-                setRecipes(recipesList);
+                setRecipes(asList(recipesList));
                 return recipesList;
             }
         } catch (error) {
             console.error('Failed to fetch recipes:', error);
         } finally {
-            setLoading(false);
+            setResourceLoading('recipes', false);
         }
-        return recipes;
-    }, [recipes]);
+        return [];
+    }, [setResourceLoading]);
 
     const addRecipe = useCallback(async (recipe: Partial<Recipe>): Promise<ApiResponse<Recipe>> => {
         const response = await recipeApi.create(serializeRecipeForApi(recipe) as Partial<Recipe>);
@@ -388,20 +480,23 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
 
     // === PANTRY ITEM FUNCTIONS ===
     const fetchAllPantryItems = useCallback(async () => {
-        setLoading(true);
+        setResourceLoading('pantry', true);
         try {
             const response = await pantryItemApi.list();
             if (response.success && response.data) {
-                setPantryItems(parsePantryItems(response.data));
+                const parsed = parsePantryItems(response.data);
+                setPantryItems(
+                    asList(enrichPantryNames(parsed, ingredientsRef.current)),
+                );
             } else if (response.success) {
                 setPantryItems([]);
             }
         } catch (error) {
             console.error('Failed to fetch pantry items:', error);
         } finally {
-            setLoading(false);
+            setResourceLoading('pantry', false);
         }
-    }, []);
+    }, [setResourceLoading]);
 
     const addPantryItem = useCallback(async (item: Partial<PantryItem>): Promise<ApiResponse<PantryItem>> => {
         const response = await pantryItemApi.create(item);
@@ -413,21 +508,39 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const updatePantryItem = useCallback(async (item: PantryItem) => {
-        const previous = pantryItems.find((i) => i.id === item.id);
-        // Optimistically update the local state first
-        setPantryItems((prev) => prev.map((i) => (i.id === item.id ? item : i)));
+        let previous: PantryItem | undefined;
+        setPantryItems((prev) => {
+            previous = prev.find((i) => i.id === item.id);
+            return prev.map((i) => (i.id === item.id ? item : i));
+        });
 
-        const response = await pantryItemApi.update(item.id, item);
-        const updated = response.success ? parsePantryItem(response.data) : null;
-        if (response.success && updated) {
-            setPantryItems((prev) => prev.map((i) => (i.id === item.id ? { ...item, ...updated } : i)));
-            return;
+        try {
+            const response = await pantryItemApi.update(item.id, item);
+            const updated = response.success ? parsePantryItem(response.data) : null;
+            if (response.success && updated) {
+                setPantryItems((prev) =>
+                    prev.map((i) => {
+                        if (i.id !== item.id) return i;
+                        // Ignore stale server qty if user tapped again while request was in flight.
+                        if (i.quantity !== item.quantity) return i;
+                        return { ...i, ...updated };
+                    }),
+                );
+                return;
+            }
+            if (previous) {
+                setPantryItems((prev) =>
+                    prev.map((i) => (i.id === item.id ? previous! : i)),
+                );
+            }
+        } catch {
+            if (previous) {
+                setPantryItems((prev) =>
+                    prev.map((i) => (i.id === item.id ? previous! : i)),
+                );
+            }
         }
-        // Rollback on hard failure
-        if (previous) {
-            setPantryItems((prev) => prev.map((i) => (i.id === item.id ? previous : i)));
-        }
-    }, [pantryItems]);
+    }, []);
 
     const updatePantryItems = useCallback(async (items: PantryItem[]) => {
         const response = await pantryItemApi.updateMany(items);
@@ -437,23 +550,56 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const removePantryItem = useCallback(async (id: string) => {
-        const response = await pantryItemApi.delete(id);
-        if (response.success) {
-            setPantryItems((prev) => prev.filter((i) => i.id !== id));
+        let previous: PantryItem[] | undefined;
+        setPantryItems((prev) => {
+            previous = prev;
+            return prev.filter((i) => i.id !== id);
+        });
+
+        try {
+            const response = await pantryItemApi.delete(id);
+            if (!response.success && previous) {
+                setPantryItems(previous);
+            }
+        } catch {
+            if (previous) {
+                setPantryItems(previous);
+            }
         }
     }, []);
 
     // === INGREDIENT FUNCTIONS ===
     const fetchAllIngredients = useCallback(async (query?: string | null) => {
+        setResourceLoading('ingredients', true);
         try {
             const response = await ingredientApi.list(query || undefined);
             if (response.success && response.data) {
-                setIngredients(response.data);
+                const next = unwrapListResponse(
+                    response.data as IngredientEntry[] | { ingredients?: IngredientEntry[] },
+                    'ingredients',
+                );
+                setIngredients(next);
+                // Backfill blank Nest list names once the catalog is available.
+                setPantryItems((prev) => enrichPantryNames(asList(prev), next));
+                setShoppingList((prev) => enrichShoppingNames(asList(prev), next));
+            } else if (response.success) {
+                setIngredients([]);
             }
         } catch (error) {
             console.error('Failed to fetch ingredients:', error);
+        } finally {
+            setResourceLoading('ingredients', false);
         }
-    }, []);
+    }, [setResourceLoading]);
+
+    // Ensure ingredient catalog is available for name backfill on pantry/shopping.
+    useEffect(() => {
+        if (!userId) {
+            setIngredients([]);
+            return;
+        }
+        void fetchAllIngredients();
+    }, [userId, fetchAllIngredients]);
 
     // === SHOPPING LIST FUNCTIONS ===
     const fetchAllShoppingListItems = useCallback(async (): Promise<ShoppingListItem[]> => {
@@ -462,7 +608,7 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
         }
 
         const cached = await loadSnapshot(userId);
-        setShoppingList(cached);
+        setShoppingList(asList(cached));
 
         const online = await getIsOnline();
         updateSyncStatus({ isOnline: online });
@@ -472,14 +618,15 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
             return cached;
         }
 
-        setLoading(true);
+        setResourceLoading('shopping', true);
         try {
             const response = await shoppingListApi.list();
             if (response.success && response.data !== undefined) {
                 const serverItems = parseShoppingListItems(response.data);
                 const merged = mergeNames(cached, serverItems);
-                setShoppingList(merged);
-                await saveSnapshot(userId, merged);
+                const enriched = enrichShoppingNames(merged, ingredientsRef.current);
+                setShoppingList(asList(enriched));
+                await saveSnapshot(userId, enriched);
                 const queue = await loadQueue(userId);
                 updateSyncStatus({
                     pendingCount: queue.length,
@@ -489,91 +636,118 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
                 if (queue.length > 0) {
                     void runFlush();
                 }
-                return merged;
+                return enriched;
             }
             if (response.success) {
                 setShoppingList([]);
                 await saveSnapshot(userId, []);
                 return [];
             }
-            // Keep cache on soft failure
-            return cached.length > 0 ? cached : shoppingList;
+            return cached;
         } catch (error) {
             console.error('Failed to fetch shopping list:', error);
-            return cached.length > 0 ? cached : shoppingList;
+            return cached;
         } finally {
-            setLoading(false);
+            setResourceLoading('shopping', false);
         }
-    }, [userId, shoppingList, updateSyncStatus, runFlush]);
+    }, [userId, shoppingList, updateSyncStatus, runFlush, setResourceLoading]);
 
     const updateShoppingListItem = useCallback(async (item: ShoppingListItem): Promise<ApiResponse<ShoppingListItem>> => {
-        const next = shoppingList.map((i) => (i.id === item.id ? item : i));
-        setShoppingList(next);
-        if (userId) {
-            await saveSnapshot(userId, next);
-            const queue = enqueueUpdate(await loadQueue(userId), item.id, {
-                name: item.name,
-                quantity: item.quantity,
-                unit: item.unit,
-                checked: item.checked,
-            });
-            await saveQueue(userId, queue);
-            updateSyncStatus({ pendingCount: queue.length, lastSyncError: null });
-            if (shoppingListSyncStatus.isOnline) {
-                void runFlush();
+        return shoppingWriteRef.current(async () => {
+            const current = userId ? await loadSnapshot(userId) : (Array.isArray(shoppingList) ? shoppingList : []);
+            const next = applyItemUpdate(asList(current), item);
+            setShoppingList(asList(next));
+            if (userId) {
+                await saveSnapshot(userId, next);
+                const queue = enqueueUpdate(await loadQueue(userId), item.id, {
+                    name: item.name,
+                    quantity: item.quantity,
+                    unit: item.unit,
+                    checked: item.checked,
+                });
+                await saveQueue(userId, queue);
+                updateSyncStatus({ pendingCount: queue.length, lastSyncError: null });
+                if (isOnlineRef.current) {
+                    scheduleFlush();
+                }
             }
-        }
-        return { success: true, data: item };
-    }, [userId, shoppingList, shoppingListSyncStatus.isOnline, updateSyncStatus, runFlush]);
+            return { success: true, data: item };
+        });
+    }, [userId, shoppingList, updateSyncStatus, scheduleFlush]);
 
     const addShoppingListItem = useCallback(async (item: Partial<ShoppingListItem>): Promise<ApiResponse<ShoppingListItem>> => {
-        const localItem: ShoppingListItem = {
-            id: createLocalItemId(),
-            name: String(item.name ?? '').trim(),
-            quantity: Number(item.quantity ?? 1),
-            unit: String(item.unit ?? ''),
-            checked: false,
-            ingredient_id: item.ingredient_id,
-            unit_kind: item.unit_kind,
-            base_unit: item.base_unit,
-            default_display_unit: item.default_display_unit,
-        };
-        if (!localItem.name) {
-            return { success: false, message: 'Item name is required' };
-        }
-
-        const next = [localItem, ...shoppingList];
-        setShoppingList(next);
-        if (userId) {
-            await saveSnapshot(userId, next);
-            const queue = enqueueCreate(await loadQueue(userId), localItem.id, {
-                name: localItem.name,
-                quantity: localItem.quantity,
-                unit: localItem.unit,
+        return shoppingWriteRef.current(async () => {
+            const localItem: ShoppingListItem = {
+                id: createLocalItemId(),
+                name: String(item.name ?? '').trim(),
+                quantity: Number(item.quantity ?? 1),
+                unit: String(item.unit ?? 'pcs'),
                 checked: false,
-            });
-            await saveQueue(userId, queue);
-            updateSyncStatus({ pendingCount: queue.length, lastSyncError: null });
-            if (shoppingListSyncStatus.isOnline) {
-                void runFlush();
+                ingredient_id: item.ingredient_id,
+                unit_kind: item.unit_kind,
+                base_unit: item.base_unit,
+                default_display_unit: item.default_display_unit,
+            };
+            if (!localItem.name) {
+                return { success: false, message: 'Item name is required' };
             }
-        }
-        return { success: true, data: localItem };
-    }, [userId, shoppingList, shoppingListSyncStatus.isOnline, updateSyncStatus, runFlush]);
+
+            const current = userId ? await loadSnapshot(userId) : [];
+            const next = [localItem, ...current];
+            setShoppingList(asList(next));
+            if (userId) {
+                await saveSnapshot(userId, next);
+                const queue = enqueueCreate(await loadQueue(userId), localItem.id, {
+                    name: localItem.name,
+                    quantity: localItem.quantity,
+                    unit: localItem.unit,
+                    checked: false,
+                });
+                await saveQueue(userId, queue);
+                updateSyncStatus({ pendingCount: queue.length, lastSyncError: null });
+                if (isOnlineRef.current) {
+                    scheduleFlush();
+                }
+            }
+            return { success: true, data: localItem };
+        });
+    }, [userId, updateSyncStatus, scheduleFlush]);
 
     const removeShoppingListItem = useCallback(async (id: string) => {
-        const next = shoppingList.filter((i) => i.id !== id);
-        setShoppingList(next);
-        if (userId) {
-            await saveSnapshot(userId, next);
-            const queue = enqueueDelete(await loadQueue(userId), id);
-            await saveQueue(userId, queue);
-            updateSyncStatus({ pendingCount: queue.length, lastSyncError: null });
-            if (shoppingListSyncStatus.isOnline) {
-                void runFlush();
+        await shoppingWriteRef.current(async () => {
+            const current = userId ? await loadSnapshot(userId) : (Array.isArray(shoppingList) ? shoppingList : []);
+            const next = applyItemRemove(asList(current), id);
+            setShoppingList(asList(next));
+            if (userId) {
+                await saveSnapshot(userId, next);
+                const queue = enqueueDelete(await loadQueue(userId), id);
+                await saveQueue(userId, queue);
+                updateSyncStatus({ pendingCount: queue.length, lastSyncError: null });
+                if (isOnlineRef.current) {
+                    scheduleFlush();
+                }
             }
-        }
-    }, [userId, shoppingList, shoppingListSyncStatus.isOnline, updateSyncStatus, runFlush]);
+        });
+    }, [userId, shoppingList, updateSyncStatus, scheduleFlush]);
+
+    const markAllShoppingListChecked = useCallback(async (): Promise<number> => {
+        return shoppingWriteRef.current(async () => {
+            const current = userId ? await loadSnapshot(userId) : (Array.isArray(shoppingList) ? shoppingList : []);
+            const { next, changed } = applyMarkAllChecked(asList(current));
+            if (changed.length === 0) return 0;
+            setShoppingList(asList(next));
+            if (userId) {
+                await saveSnapshot(userId, next);
+                const queue = enqueueMarkAllUpdates(await loadQueue(userId), changed);
+                await saveQueue(userId, queue);
+                updateSyncStatus({ pendingCount: queue.length, lastSyncError: null });
+                if (isOnlineRef.current) {
+                    scheduleFlush();
+                }
+            }
+            return changed.length;
+        });
+    }, [userId, shoppingList, updateSyncStatus, scheduleFlush]);
 
     const retryShoppingListSync = useCallback(async () => {
         await runFlush();
@@ -581,7 +755,7 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
 
     // === MEAL PLAN FUNCTIONS ===
     const fetchAllMealPlans = useCallback(async (): Promise<MealPlan[]> => {
-        setLoading(true);
+        setResourceLoading('mealPlan', true);
         try {
             const response = await mealPlanApi.list();
             if (response.success && response.data) {
@@ -589,16 +763,16 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
                     response.data as MealPlan[] | { mealPlans?: MealPlan[] },
                     'mealPlans'
                 ).map((plan) => normalizeMealPlan(plan as unknown as Record<string, unknown>));
-                setMealPlan(list);
+                setMealPlan(asList(list));
                 return list;
             }
         } catch (error) {
             console.error('Failed to fetch meal plans:', error);
         } finally {
-            setLoading(false);
+            setResourceLoading('mealPlan', false);
         }
-        return mealPlan;
-    }, [mealPlan]);
+        return [];
+    }, [setResourceLoading]);
 
     const addMealPlan = useCallback(async (newMealPlan: Partial<MealPlan>): Promise<ApiResponse<MealPlan>> => {
         const response = await mealPlanApi.create(newMealPlan);
@@ -656,43 +830,86 @@ export function PantryProvider({ children }: { children: React.ReactNode }) {
         // TODO: Add API call for user settings when available
     }, []);
 
-    const value: PantryContextType = {
-        loading,
-        recipes,
-        pantryItems,
-        shoppingList,
-        shoppingListSyncStatus,
-        folders,
-        ingredients,
-        mealPlan,
-        userSettings,
-        addRecipe,
-        fetchAllRecipes,
-        updateRecipe,
-        deleteRecipe,
-        updateUserSettings,
-        fetchAllFolders,
-        addFolder,
-        deleteFolder,
-        updateFolder,
-        fetchAllPantryItems,
-        updatePantryItem,
-        updatePantryItems,
-        addPantryItem,
-        removePantryItem,
-        fetchAllIngredients,
-        fetchAllShoppingListItems,
-        updateShoppingListItem,
-        addShoppingListItem,
-        removeShoppingListItem,
-        retryShoppingListSync,
-        fetchAllMealPlans,
-        addMealPlan,
-        updateMealPlan,
-        deleteMealPlan,
-        confirmMealPlan,
-        skipMealPlan,
-    };
+    const value: PantryContextType = useMemo(
+        () => ({
+            loading,
+            loadingByResource,
+            recipes: asList(recipes),
+            pantryItems: asList(pantryItems),
+            shoppingList: asList(shoppingList),
+            shoppingListSyncStatus,
+            folders: asList(folders),
+            ingredients: asList(ingredients),
+            mealPlan: asList(mealPlan),
+            userSettings,
+            addRecipe,
+            fetchAllRecipes,
+            updateRecipe,
+            deleteRecipe,
+            updateUserSettings,
+            fetchAllFolders,
+            addFolder,
+            deleteFolder,
+            updateFolder,
+            fetchAllPantryItems,
+            updatePantryItem,
+            updatePantryItems,
+            addPantryItem,
+            removePantryItem,
+            fetchAllIngredients,
+            fetchAllShoppingListItems,
+            updateShoppingListItem,
+            addShoppingListItem,
+            removeShoppingListItem,
+            markAllShoppingListChecked,
+            retryShoppingListSync,
+            fetchAllMealPlans,
+            addMealPlan,
+            updateMealPlan,
+            deleteMealPlan,
+            confirmMealPlan,
+            skipMealPlan,
+        }),
+        [
+            loading,
+            loadingByResource,
+            recipes,
+            pantryItems,
+            shoppingList,
+            shoppingListSyncStatus,
+            folders,
+            ingredients,
+            mealPlan,
+            userSettings,
+            addRecipe,
+            fetchAllRecipes,
+            updateRecipe,
+            deleteRecipe,
+            updateUserSettings,
+            fetchAllFolders,
+            addFolder,
+            deleteFolder,
+            updateFolder,
+            fetchAllPantryItems,
+            updatePantryItem,
+            updatePantryItems,
+            addPantryItem,
+            removePantryItem,
+            fetchAllIngredients,
+            fetchAllShoppingListItems,
+            updateShoppingListItem,
+            addShoppingListItem,
+            removeShoppingListItem,
+            markAllShoppingListChecked,
+            retryShoppingListSync,
+            fetchAllMealPlans,
+            addMealPlan,
+            updateMealPlan,
+            deleteMealPlan,
+            confirmMealPlan,
+            skipMealPlan,
+        ],
+    );
 
     return <PantryContext.Provider value={value}>{children}</PantryContext.Provider>;
 }

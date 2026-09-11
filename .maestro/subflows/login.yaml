@@ -1,0 +1,47 @@
+appId: com.lardermind.app
+---
+# Log in when the auth form is showing (skip if already on main tabs).
+- runFlow:
+    when:
+      visible: "Email"
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: "login-email"
+          timeout: 30000
+      - tapOn:
+          id: "login-email"
+      - eraseText: 80
+      - inputText: ${EMAIL}
+      - tapOn:
+          id: "login-password"
+      - eraseText: 80
+      - inputText: ${PASSWORD}
+      - hideKeyboard
+      - tapOn:
+          id: "login-submit"
+      - repeat:
+          times: 3
+          commands:
+            - runFlow:
+                when:
+                  visible: "TypeError"
+                commands:
+                  - tapOn:
+                      text: ".*RELOAD.*"
+                  - extendedWaitUntil:
+                      notVisible: "TypeError"
+                      timeout: 60000
+            - extendedWaitUntil:
+                visible:
+                  id: "header-menu"
+                timeout: 30000
+                optional: true
+      - extendedWaitUntil:
+          visible:
+            id: "header-menu"
+          timeout: 90000
+      - extendedWaitUntil:
+          visible:
+            id: "header-menu"
+          timeout: 15000
